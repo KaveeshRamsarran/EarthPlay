@@ -1259,6 +1259,12 @@ class WorldboxGame {
         if (this.updateCounter % 60 === 0) {
             this.year++;
             
+            // Auto-create kingdoms for civilized races
+            const civilizedRaces = ['human', 'elf', 'dwarf', 'orc', 'undead'];
+            civilizedRaces.forEach(race => {
+                this.checkAndCreateAutoKingdom(race);
+            });
+            
             // Update kingdoms
             this.civSystem.kingdoms.forEach(kingdom => {
                 // Update population count
@@ -1271,6 +1277,12 @@ class WorldboxGame {
                 kingdom.resources.food += kingdom.techLevel * 10;
                 kingdom.resources.gold += kingdom.techLevel * 5;
                 kingdom.resources.wood += kingdom.techLevel * 8;
+                
+                // Auto-construct capital when population threshold reached
+                if (this.civSystem.shouldConstructCapital(kingdom)) {
+                    const territoryTiles = this.getTerritoryTiles(kingdom.id);
+                    this.civSystem.constructCapital(kingdom, territoryTiles);
+                }
             });
             
             // Diplomacy changes
@@ -1420,6 +1432,65 @@ class WorldboxGame {
             }
         });
 
+        // Draw kingdom structures (castles, towers, walls)
+        this.civSystem.kingdoms.forEach(kingdom => {
+            kingdom.structures.forEach(structure => {
+                const screenX = structure.x * this.tileSize;
+                const screenY = structure.y * this.tileSize;
+
+                // Draw structure
+                this.ctx.fillStyle = structure.color;
+                this.ctx.strokeStyle = '#FFFFFF';
+                this.ctx.lineWidth = 2;
+
+                if (structure.type === 'castle') {
+                    // Large castle keep
+                    this.ctx.fillRect(screenX + 2, screenY + 2, this.tileSize - 4, this.tileSize - 4);
+                    this.ctx.strokeRect(screenX + 2, screenY + 2, this.tileSize - 4, this.tileSize - 4);
+                    // Castle flags on top
+                    this.ctx.fillStyle = '#FFD700';
+                    this.ctx.fillRect(screenX + 6, screenY, 4, 4);
+                    this.ctx.fillRect(screenX + this.tileSize - 10, screenY, 4, 4);
+                } else if (structure.type === 'tower') {
+                    // Tower (circular)
+                    this.ctx.beginPath();
+                    this.ctx.arc(screenX + this.tileSize / 2, screenY + this.tileSize / 2, 6, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.stroke();
+                    // Arrow indicator
+                    this.ctx.fillStyle = '#FFD700';
+                    this.ctx.fillRect(screenX + this.tileSize / 2 - 2, screenY + 2, 4, 3);
+                } else if (structure.type === 'wall') {
+                    // Wall segment
+                    this.ctx.fillRect(screenX + 4, screenY + 4, this.tileSize - 8, this.tileSize - 8);
+                    this.ctx.strokeRect(screenX + 4, screenY + 4, this.tileSize - 8, this.tileSize - 8);
+                } else if (structure.type === 'hall') {
+                    // Meeting hall
+                    this.ctx.fillRect(screenX + 3, screenY + 3, this.tileSize - 6, this.tileSize - 6);
+                    this.ctx.strokeRect(screenX + 3, screenY + 3, this.tileSize - 6, this.tileSize - 6);
+                    // Door
+                    this.ctx.fillStyle = '#8B4513';
+                    this.ctx.fillRect(screenX + this.tileSize / 2 - 2, screenY + this.tileSize - 4, 4, 4);
+                } else if (structure.type === 'house') {
+                    // Small house
+                    this.ctx.fillRect(screenX + 4, screenY + 4, this.tileSize - 8, this.tileSize - 8);
+                    this.ctx.strokeRect(screenX + 4, screenY + 4, this.tileSize - 8, this.tileSize - 8);
+                    // Window
+                    this.ctx.fillStyle = '#87CEEB';
+                    this.ctx.fillRect(screenX + 6, screenY + 6, 3, 3);
+                }
+
+                // Draw health bar if damaged
+                if (structure.health < structure.maxHealth) {
+                    const healthPercent = structure.health / structure.maxHealth;
+                    this.ctx.fillStyle = '#FF0000';
+                    this.ctx.fillRect(screenX, screenY - 4, this.tileSize * healthPercent, 2);
+                    this.ctx.strokeStyle = '#FFFFFF';
+                    this.ctx.strokeRect(screenX, screenY - 4, this.tileSize, 2);
+                }
+            });
+        });
+
         // Draw vehicles
         this.vehicles.forEach(v => {
             const sprite = this.spriteGen.getSprite(v.type);
@@ -1543,6 +1614,82 @@ class WorldboxGame {
     reset() {
         this.clearWorld();
         this.generateTerrain();
+    }
+
+    checkAndCreateAutoKingdom(race) {
+        // Find all creatures of this race not in a kingdom
+        const unKingdomedCreatures = this.creatures.filter(c => 
+            c.type === race && !c.kingdom
+        );
+
+        // Group nearby creatures together
+        const clusters = [];
+        const processed = new Set();
+
+        unKingdomedCreatures.forEach(creature => {
+            if (processed.has(creature)) return;
+
+            const cluster = [creature];
+            processed.add(creature);
+
+            // Find all nearby creatures (within distance of 30 tiles)
+            unKingdomedCreatures.forEach(other => {
+                if (processed.has(other)) return;
+                const dist = Math.hypot(creature.x - other.x, creature.y - other.y);
+                if (dist < 30) {
+                    cluster.push(other);
+                    processed.add(other);
+                }
+            });
+
+            if (cluster.length >= 5) { // Need at least 5 creatures to form kingdom
+                clusters.push(cluster);
+            }
+        });
+
+        // Create kingdom for each viable cluster
+        clusters.forEach(cluster => {
+            // Calculate cluster center
+            const centerX = cluster.reduce((sum, c) => sum + c.x, 0) / cluster.length;
+            const centerY = cluster.reduce((sum, c) => sum + c.y, 0) / cluster.length;
+
+            // Check if kingdom already exists at this location
+            const existingKingdom = this.civSystem.kingdoms.find(k => 
+                k.race === race && 
+                Math.hypot(k.centerX - centerX, k.centerY - centerY) < 40
+            );
+
+            if (!existingKingdom) {
+                // Create new kingdom for this cluster
+                const newKingdom = this.civSystem.createKingdom(
+                    Math.round(centerX), 
+                    Math.round(centerY), 
+                    race
+                );
+
+                // Assign all creatures in cluster to kingdom
+                cluster.forEach(creature => {
+                    this.civSystem.assignCreatureToKingdom(creature, newKingdom);
+                });
+            }
+        });
+    }
+
+    getTerritoryTiles(kingdomId) {
+        const territory = [];
+        const kingdom = this.civSystem.kingdoms.find(k => k.id === kingdomId);
+        if (!kingdom) return territory;
+
+        // Find all tiles that belong to kingdom (within distance)
+        for (let y = 0; y < this.gridHeight; y++) {
+            for (let x = 0; x < this.gridWidth; x++) {
+                const dist = Math.hypot(x - kingdom.centerX, y - kingdom.centerY);
+                if (dist < 40) { // Territory radius
+                    territory.push({ x, y });
+                }
+            }
+        }
+        return territory;
     }
 
     startGameLoop() {

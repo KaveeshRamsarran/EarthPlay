@@ -9,6 +9,84 @@ class CivilizationSystem {
         this.techTrees = this.initializeTechTrees();
         this.nextKingdomId = 1;
         this.nextCivilizationId = 1;
+        this.usedKingdomNames = new Set(); // Track unique kingdom names
+        this.kingdomNameGenerators = this.initializeKingdomNameGenerators();
+        this.usedKingdomColors = new Set(); // Track unique kingdom colors
+    }
+
+    initializeKingdomNameGenerators() {
+        return {
+            human: [
+                ['New', 'Old', 'Great', 'United', 'Eastern', 'Western', 'Northern', 'Southern', 'Holy', 'Royal'],
+                ['York', 'Haven', 'Spring', 'Ford', 'Castle', 'Keep', 'Warren', 'shire', 'field', 'mount'],
+                ['', ' Kingdom', ' Empire', ' Realm', ' Domain', ' Territory']
+            ],
+            elf: [
+                ['Silver', 'Golden', 'Eternal', 'Ancient', 'Mystical', 'Twilight', 'Moonlit', 'Crystal', 'Starlight', 'Enchanted'],
+                ['wood', 'vale', 'glade', 'haven', 'realm', 'throne', 'crown', 'light', 'star', 'mist'],
+                ['', ' of the Woods', ' of Stars', ' Eternal', ' Timeless']
+            ],
+            dwarf: [
+                ['Iron', 'Stone', 'Deep', 'Grand', 'Mighty', 'Ancient', 'North', 'South', 'Mount', 'Peak'],
+                ['hold', 'forge', 'hall', 'deep', 'stone', 'gate', 'breach', 'horn', 'rock', 'guard'],
+                ['', ' Kingdom', ' Stronghold', ' Citadel', ' Fortress']
+            ],
+            orc: [
+                ['Dark', 'War', 'Wild', 'Savage', 'Storm', 'Blood', 'Fire', 'Tusk', 'Claw', 'Bone'],
+                ['hold', 'tribe', 'clan', 'horde', 'peak', 'ridge', 'skull', 'tooth', 'fang', 'maw'],
+                ['', ' Horde', ' Tribe', ' Clan', ' Dominion']
+            ],
+            undead: [
+                ['Cursed', 'Eternal', 'Dark', 'Vile', 'Forsaken', 'Doomed', 'Plague', 'Death', 'Unholy', 'Decay'],
+                ['tomb', 'tomb', 'mire', 'grave', 'crypt', 'lair', 'realm', 'den', 'abyss', 'blight'],
+                ['', ' Undead', ' of Death', ' Eternal', ' Accursed']
+            ]
+        };
+    }
+
+    generateUniqueName(race) {
+        const generators = this.kingdomNameGenerators[race];
+        if (!generators) return `${this.races[race].name} Kingdom ${this.nextKingdomId}`;
+
+        let name;
+        let attempts = 0;
+        const maxAttempts = 20;
+
+        do {
+            const prefix = generators[0][Math.floor(Math.random() * generators[0].length)];
+            const middle = generators[1][Math.floor(Math.random() * generators[1].length)];
+            const suffix = generators[2][Math.floor(Math.random() * generators[2].length)];
+            
+            name = (prefix + middle + suffix).replace(/([a-z])([A-Z])/g, '$1 $2').trim();
+            attempts++;
+        } while (this.usedKingdomNames.has(name) && attempts < maxAttempts);
+
+        this.usedKingdomNames.add(name);
+        return name;
+    }
+
+    generateUniqueKingdomColor(baseColor) {
+        const hex = baseColor.replace('#', '');
+        const r = parseInt(hex.substr(0, 2), 16);
+        const g = parseInt(hex.substr(2, 2), 16);
+        const b = parseInt(hex.substr(4, 2), 16);
+
+        let color;
+        let attempts = 0;
+        const maxAttempts = 30;
+
+        do {
+            const variation = Math.floor(Math.random() * 50) - 25;
+            const newR = Math.max(0, Math.min(255, r + variation));
+            const newG = Math.max(0, Math.min(255, g + variation));
+            const newB = Math.max(0, Math.min(255, b + variation));
+            
+            color = '#' + [newR, newG, newB].map(x => x.toString(16).padStart(2, '0')).join('');
+            attempts++;
+        } while (this.usedKingdomColors.has(color) && attempts < maxAttempts);
+
+        this.usedKingdomColors.add(color);
+        return color;
     }
 
     initializeRaces() {
@@ -287,7 +365,7 @@ class CivilizationSystem {
 
         const kingdom = {
             id: this.nextKingdomId++,
-            name: name || `${raceData.name} Kingdom ${this.nextKingdomId}`,
+            name: name || this.generateUniqueName(race),
             race: race,
             centerX: centerX,
             centerY: centerY,
@@ -295,6 +373,7 @@ class CivilizationSystem {
             citizenCount: 0,
             territory: [], // Grid tiles controlled by kingdom
             buildings: [],
+            structures: [], // Castle, towers, etc
             resources: { food: 100, gold: 50, wood: 100, stone: 50 },
             techLevel: raceData.startingTechLevel,
             happiness: 50,
@@ -305,26 +384,13 @@ class CivilizationSystem {
             warTargets: [],
             alliances: [],
             createdAt: Date.now(),
-            color: this.generateKingdomColor(raceData.baseColor)
+            color: this.generateUniqueKingdomColor(raceData.baseColor),
+            hasConstructedCapital: false,
+            populationThreshold: 10 // Minimum population to construct capital
         };
 
         this.kingdoms.push(kingdom);
         return kingdom;
-    }
-
-    generateKingdomColor(baseColor) {
-        // Add some variation to the base color
-        const hex = baseColor.replace('#', '');
-        const r = parseInt(hex.substr(0, 2), 16);
-        const g = parseInt(hex.substr(2, 2), 16);
-        const b = parseInt(hex.substr(4, 2), 16);
-
-        const variation = Math.floor(Math.random() * 40) - 20;
-        const newR = Math.max(0, Math.min(255, r + variation));
-        const newG = Math.max(0, Math.min(255, g + variation));
-        const newB = Math.max(0, Math.min(255, b + variation));
-
-        return '#' + [newR, newG, newB].map(x => x.toString(16).padStart(2, '0')).join('');
     }
 
     createCreatureWithTraits(x, y, race, traits = []) {
@@ -402,6 +468,144 @@ class CivilizationSystem {
         creature.religion = kingdom.religion;
         kingdom.citizenCount++;
         kingdom.population++;
+    }
+
+    generateCastleStructure(kingdom, centerX, centerY) {
+        /**
+         * Generate a castle layout:
+         * Main castle (3x3), surrounded by towers and walls
+         */
+        const structures = [];
+        
+        // Main castle - keep structure (center 3x3)
+        for (let dx = -1; dx <= 1; dx++) {
+            for (let dy = -1; dy <= 1; dy++) {
+                structures.push({
+                    type: 'castle',
+                    x: centerX + dx,
+                    y: centerY + dy,
+                    kingdomId: kingdom.id,
+                    health: 300,
+                    maxHealth: 300,
+                    color: kingdom.color,
+                    radius: 1.5
+                });
+            }
+        }
+
+        // Corner towers (guard towers)
+        const corners = [[-3, -3], [3, -3], [-3, 3], [3, 3]];
+        corners.forEach(([cx, cy]) => {
+            structures.push({
+                type: 'tower',
+                x: centerX + cx,
+                y: centerY + cy,
+                kingdomId: kingdom.id,
+                health: 150,
+                maxHealth: 150,
+                color: kingdom.color,
+                radius: 0.8,
+                arrowRange: 8
+            });
+        });
+
+        // Walls connecting castle to towers (4 cardinal walls)
+        const wallPositions = [
+            { x: centerX, y: centerY - 2 }, // North
+            { x: centerX, y: centerY + 2 }, // South
+            { x: centerX - 2, y: centerY }, // West
+            { x: centerX + 2, y: centerY }  // East
+        ];
+
+        wallPositions.forEach(pos => {
+            structures.push({
+                type: 'wall',
+                x: pos.x,
+                y: pos.y,
+                kingdomId: kingdom.id,
+                health: 100,
+                maxHealth: 100,
+                color: kingdom.color,
+                radius: 0.6
+            });
+        });
+
+        return structures;
+    }
+
+    generateVillageStructures(kingdom, centerX, centerY) {
+        /**
+         * Generate a small village:
+         * Few houses around a center building
+         */
+        const structures = [];
+        
+        // Center meeting hall
+        structures.push({
+            type: 'hall',
+            x: centerX,
+            y: centerY,
+            kingdomId: kingdom.id,
+            health: 100,
+            maxHealth: 100,
+            color: kingdom.color,
+            radius: 1
+        });
+
+        // Houses in circle around center
+        const housePositions = [
+            [-2, -2], [0, -2], [2, -2],
+            [-2, 0], [2, 0],
+            [-2, 2], [0, 2], [2, 2]
+        ];
+
+        housePositions.forEach(([dx, dy]) => {
+            structures.push({
+                type: 'house',
+                x: centerX + dx,
+                y: centerY + dy,
+                kingdomId: kingdom.id,
+                health: 50,
+                maxHealth: 50,
+                color: kingdom.color,
+                radius: 0.7
+            });
+        });
+
+        return structures;
+    }
+
+    shouldConstructCapital(kingdom) {
+        // Build castle when population reaches threshold and not already built
+        return kingdom.population >= kingdom.populationThreshold && !kingdom.hasConstructedCapital;
+    }
+
+    constructCapital(kingdom, territoryTiles) {
+        // Find center of kingdom territory or use kingdom center
+        if (kingdom.hasConstructedCapital) return;
+
+        let centerX = kingdom.centerX;
+        let centerY = kingdom.centerY;
+
+        // Find best position (center of territory)
+        if (territoryTiles && territoryTiles.length > 0) {
+            let sumX = 0, sumY = 0;
+            territoryTiles.slice(0, Math.min(100, territoryTiles.length)).forEach(tile => {
+                sumX += tile.x;
+                sumY += tile.y;
+            });
+            centerX = Math.round(sumX / Math.min(100, territoryTiles.length));
+            centerY = Math.round(sumY / Math.min(100, territoryTiles.length));
+        }
+
+        const castle = this.generateCastleStructure(kingdom, centerX, centerY);
+        kingdom.structures.push(...castle);
+        kingdom.hasConstructedCapital = true;
+    }
+
+    constructVillage(kingdom, centerX, centerY) {
+        const village = this.generateVillageStructures(kingdom, centerX, centerY);
+        kingdom.structures.push(...village);
     }
 
     updateDiplomacy(kingdomId1, kingdomId2, change) {
