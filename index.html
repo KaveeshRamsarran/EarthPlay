@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Worldbox Clone - World Simulator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="logo">
+                <h1>🌍 Worldbox</h1>
+                <p>World Simulator</p>
+            </div>
+
+            <!-- Tool Selection -->
+            <div class="tools-section">
+                <h3>Tools</h3>
+                <div class="tool-buttons">
+                    <button class="tool-btn" data-tool="pause" title="Pause/Resume">⏸️ Pause</button>
+                    <button class="tool-btn" data-tool="speed" title="Speed Control">⚡ Speed</button>
+                </div>
+                <div class="speed-control">
+                    <label for="speed">Game Speed:</label>
+                    <input type="range" id="speed" min="0.1" max="3" step="0.1" value="1">
+                    <span id="speedDisplay">1x</span>
+                </div>
+            </div>
+
+            <!-- Brush Tools -->
+            <div class="tools-section">
+                <h3>Terrain</h3>
+                <div class="tool-grid">
+                    <button class="brush-btn selected" data-brush="grass" style="background-color: #4CAF50;" title="Grass">🌱</button>
+                    <button class="brush-btn" data-brush="dirt" style="background-color: #8B7355;" title="Dirt">🟫</button>
+                    <button class="brush-btn" data-brush="stone" style="background-color: #808080;" title="Stone">⬜</button>
+                    <button class="brush-btn" data-brush="sand" style="background-color: #F4A460;" title="Sand">🟨</button>
+                    <button class="brush-btn" data-brush="water" style="background-color: #2196F3;" title="Water">💧</button>
+                    <button class="brush-btn" data-brush="lava" style="background-color: #FF6B35;" title="Lava">🔥</button>
+                    <button class="brush-btn" data-brush="forest" style="background-color: #1B5E20;" title="Forest">🌲</button>
+                    <button class="brush-btn" data-brush="mountain" style="background-color: #4A4A4A;" title="Mountain">⛰️</button>
+                </div>
+            </div>
+
+            <!-- Creature Tools -->
+            <div class="tools-section">
+                <h3>Creatures</h3>
+                <div class="tool-grid">
+                    <button class="creature-btn" data-creature="human" title="Humans">👤</button>
+                    <button class="creature-btn" data-creature="elf" title="Elves">👳</button>
+                    <button class="creature-btn" data-creature="dwarf" title="Dwarves">🧔</button>
+                    <button class="creature-btn" data-creature="orc" title="Orcs">👹</button>
+                    <button class="creature-btn" data-creature="undead" title="Undead">💀</button>
+                </div>
+            </div>
+
+            <!-- Brush Size -->
+            <div class="tools-section">
+                <h3>Brush Size</h3>
+                <input type="range" id="brushSize" min="1" max="20" value="3">
+                <span id="brushSizeDisplay">3</span>
+            </div>
+
+            <!-- Hazards -->
+            <div class="tools-section">
+                <h3>Hazards</h3>
+                <div class="tool-grid">
+                    <button class="hazard-btn" data-hazard="meteor" title="Meteor">☄️</button>
+                    <button class="hazard-btn" data-hazard="plague" title="Plague">☠️</button>
+                    <button class="hazard-btn" data-hazard="lightning" title="Lightning">⚡</button>
+                    <button class="hazard-btn" data-hazard="volcano" title="Volcano">🌋</button>
+                </div>
+            </div>
+
+            <!-- Information Panel -->
+            <div class="tools-section">
+                <h3>World Stats</h3>
+                <div class="stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Population:</span>
+                        <span class="stat-value" id="populationCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Humans:</span>
+                        <span class="stat-value" id="humanCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Elves:</span>
+                        <span class="stat-value" id="elfCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Dwarves:</span>
+                        <span class="stat-value" id="dwarfCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Orcs:</span>
+                        <span class="stat-value" id="orcCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Undead:</span>
+                        <span class="stat-value" id="undeadCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Year:</span>
+                        <span class="stat-value" id="yearCount">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="tools-section">
+                <h3>Actions</h3>
+                <button class="action-btn" id="clearBtn">Clear World</button>
+                <button class="action-btn" id="generateBtn">Generate Terrain</button>
+                <button class="action-btn" id="resetBtn">Reset</button>
+            </div>
+        </div>
+
+        <!-- Main Canvas Area -->
+        <div class="main-content">
+            <div class="canvas-container">
+                <canvas id="gameCanvas"></canvas>
+                <div class="crosshair"></div>
+            </div>
+            <div class="info-bar">
+                <span id="mouseInfo">X: 0, Y: 0</span>
+                <span id="fpsInfo">FPS: 60</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="spriteGenerator.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>

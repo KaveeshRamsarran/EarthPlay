@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Worldbox Clone - Launcher</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        .logo-text {
+            font-size: 48px;
+            margin-bottom: 20px;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0px);
+            }
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+
+        h1 {
+            font-size: 48px;
+            color: #4CAF50;
+            text-shadow: 0 0 20px rgba(76, 175, 80, 0.5);
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #aaa;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+
+        .version {
+            color: #666;
+            font-size: 12px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .card {
+            background-color: rgba(42, 42, 42, 0.8);
+            border: 2px solid #4CAF50;
+            border-radius: 10px;
+            padding: 30px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(76, 175, 80, 0.3);
+            border-color: #66BB6A;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(76, 175, 80, 0.1), transparent);
+            transition: left 0.5s;
+        }
+
+        .card:hover::before {
+            left: 100%;
+        }
+
+        .card-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .card-title {
+            color: #4CAF50;
+            font-size: 22px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .card-description {
+            color: #aaa;
+            font-size: 14px;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        .card-button {
+            background-color: #4CAF50;
+            color: #1a1a1a;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-block;
+            text-decoration: none;
+            position: relative;
+            z-index: 1;
+        }
+
+        .card-button:hover {
+            background-color: #66BB6A;
+            transform: scale(1.05);
+        }
+
+        .card-button:active {
+            transform: scale(0.98);
+        }
+
+        .features {
+            background-color: rgba(76, 175, 80, 0.1);
+            border: 2px solid #4CAF50;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+
+        .features h2 {
+            color: #4CAF50;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .feature-icon {
+            font-size: 24px;
+        }
+
+        .feature-text {
+            color: #ddd;
+            font-size: 13px;
+        }
+
+        .system-info {
+            background-color: rgba(42, 42, 42, 0.8);
+            border: 1px solid #555;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+            font-size: 13px;
+            color: #aaa;
+        }
+
+        .system-info-title {
+            color: #4CAF50;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .system-info-item {
+            padding: 5px 0;
+        }
+
+        .footer {
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+            padding-top: 20px;
+            border-top: 1px solid #444;
+        }
+
+        .divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #4CAF50, transparent);
+            margin: 30px 0;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 36px;
+            }
+
+            .logo-text {
+                font-size: 36px;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo-text">🌍</div>
+            <h1>Worldbox Clone</h1>
+            <p class="subtitle">World Simulator Game</p>
+            <p class="version">Version 1.0 | Made with Pure JavaScript</p>
+        </div>
+
+        <!-- Quick Start Cards -->
+        <div class="grid">
+            <!-- Game Card -->
+            <div class="card">
+                <div class="card-icon">🎮</div>
+                <div class="card-title">Play Game</div>
+                <div class="card-description">
+                    Jump right into the action! Create worlds, spawn creatures, and manage civilizations.
+                </div>
+                <a href="index.html" class="card-button">Launch →</a>
+            </div>
+
+            <!-- Quick Start Card -->
+            <div class="card">
+                <div class="card-icon">📖</div>
+                <div class="card-title">Quick Start</div>
+                <div class="card-description">
+                    New to the game? Learn the basics in 5 minutes with our interactive guide.
+                </div>
+                <a href="quickstart.html" class="card-button">Learn →</a>
+            </div>
+
+            <!-- Documentation Card -->
+            <div class="card">
+                <div class="card-icon">📚</div>
+                <div class="card-title">Documentation</div>
+                <div class="card-description">
+                    Complete feature list, mechanics, and everything you need to know.
+                </div>
+                <a href="README.md" class="card-button" target="_blank">Read →</a>
+            </div>
+        </div>
+
+        <!-- Features Showcase -->
+        <div class="features">
+            <h2>✨ Key Features</h2>
+            <div class="features-grid">
+                <div class="feature-item">
+                    <span class="feature-icon">🖌️</span>
+                    <span class="feature-text">8 Terrain Types</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">👥</span>
+                    <span class="feature-text">5 Creature Species</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">⚡</span>
+                    <span class="feature-text">4 Hazard Types</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">📊</span>
+                    <span class="feature-text">Live Statistics</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">🎨</span>
+                    <span class="feature-text">Pixel Art Sprites</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">🎮</span>
+                    <span class="feature-text">Full Simulation</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">⚙️</span>
+                    <span class="feature-text">Game Speed Control</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">💾</span>
+                    <span class="feature-text">No Installation</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Requirements -->
+        <div class="system-info">
+            <div class="system-info-title">✓ System Requirements</div>
+            <div class="system-info-item">✓ Modern web browser (Chrome, Firefox, Edge, Safari)</div>
+            <div class="system-info-item">✓ JavaScript enabled</div>
+            <div class="system-info-item">✓ Canvas 2D API support</div>
+            <div class="system-info-item">✓ No external dependencies required</div>
+            <div class="system-info-item">✓ Works offline - completely local</div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- File Overview -->
+        <div class="system-info">
+            <div class="system-info-title">📁 Project Files</div>
+            <div class="system-info-item"><strong>index.html</strong> - Main game interface</div>
+            <div class="system-info-item"><strong>game.js</strong> - Core game logic (20KB)</div>
+            <div class="system-info-item"><strong>spriteGenerator.js</strong> - Pixel art generation (10KB)</div>
+            <div class="system-info-item"><strong>styles.css</strong> - Beautiful UI styling (6KB)</div>
+            <div class="system-info-item"><strong>quickstart.html</strong> - Interactive tutorial</div>
+            <div class="system-info-item"><strong>README.md</strong> - Full documentation</div>
+            <div class="system-info-item"><strong>FEATURES.md</strong> - Complete feature list</div>
+            <div class="system-info-item"><strong>CUSTOMIZATION.md</strong> - Modification guide</div>
+        </div>
+
+        <!-- Tips Section -->
+        <div class="system-info">
+            <div class="system-info-title">💡 Quick Tips</div>
+            <div class="system-info-item">💧 Use water as natural barriers between civilizations</div>
+            <div class="system-info-item">🌲 Place forests to attract and sustain populations</div>
+            <div class="system-info-item">⚡ Pause the game to plan large terrain changes</div>
+            <div class="system-info-item">📊 Check statistics to monitor civilization progress</div>
+            <div class="system-info-item">🎨 Experiment with different disaster scenarios</div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>🌍 Worldbox Clone v1.0</p>
+            <p>Built with ❤️ using vanilla JavaScript, HTML5 Canvas, and CSS3</p>
+            <p>© 2025 - Free to use, modify, and distribute</p>
+        </div>
+    </div>
+</body>
+</html>

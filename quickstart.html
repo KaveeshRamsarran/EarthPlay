@@ -1,0 +1,450 @@
+<!-- Quick Start Guide - Save as quickstart.html for easy reference -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Worldbox Clone - Quick Start Guide</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+            color: #fff;
+            padding: 40px 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: rgba(42, 42, 42, 0.8);
+            border: 2px solid #4CAF50;
+            border-radius: 10px;
+            padding: 40px;
+            box-shadow: 0 0 30px rgba(76, 175, 80, 0.3);
+        }
+
+        h1 {
+            color: #4CAF50;
+            margin-bottom: 10px;
+            font-size: 36px;
+            text-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+        }
+
+        .subtitle {
+            color: #aaa;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        h2 {
+            color: #4CAF50;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            font-size: 24px;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+
+        h3 {
+            color: #66BB6A;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+
+        .section {
+            margin-bottom: 25px;
+        }
+
+        .feature-list {
+            list-style: none;
+            margin-left: 0;
+        }
+
+        .feature-list li {
+            padding: 8px 0;
+            padding-left: 20px;
+            position: relative;
+            color: #ddd;
+        }
+
+        .feature-list li:before {
+            content: "▶ ";
+            color: #4CAF50;
+            position: absolute;
+            left: 0;
+        }
+
+        .control-box {
+            background-color: rgba(76, 175, 80, 0.1);
+            border-left: 4px solid #4CAF50;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+
+        .control-box strong {
+            color: #4CAF50;
+        }
+
+        .step {
+            background-color: rgba(76, 175, 80, 0.05);
+            padding: 15px;
+            margin: 12px 0;
+            border-radius: 4px;
+            border-left: 3px solid #4CAF50;
+        }
+
+        .step-number {
+            display: inline-block;
+            background-color: #4CAF50;
+            color: #1a1a1a;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 24px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .highlight {
+            background-color: rgba(255, 107, 53, 0.2);
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #FF8A50;
+        }
+
+        .tips {
+            background-color: rgba(255, 193, 7, 0.1);
+            border-left: 4px solid #FFC107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .tips strong {
+            color: #FFD54F;
+        }
+
+        .start-btn {
+            display: inline-block;
+            background-color: #4CAF50;
+            color: #1a1a1a;
+            padding: 15px 40px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+
+        .start-btn:hover {
+            background-color: #66BB6A;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+        }
+
+        .footer {
+            text-align: center;
+            color: #666;
+            margin-top: 40px;
+            font-size: 12px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        td, th {
+            border: 1px solid #4CAF50;
+            padding: 12px;
+            text-align: left;
+        }
+
+        th {
+            background-color: rgba(76, 175, 80, 0.2);
+            color: #4CAF50;
+            font-weight: bold;
+        }
+
+        tr:hover {
+            background-color: rgba(76, 175, 80, 0.05);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌍 Worldbox Clone</h1>
+        <p class="subtitle">World Simulator Game - Quick Start Guide</p>
+
+        <div class="section">
+            <h2>🎮 Welcome!</h2>
+            <p>
+                This is a Worldbox-inspired world simulator built with pure JavaScript. Create terrain, spawn creatures, 
+                manage civilizations, and trigger disasters! No downloads or installation needed—just open the game in your browser.
+            </p>
+        </div>
+
+        <div class="section">
+            <h2>🚀 Getting Started in 5 Steps</h2>
+            
+            <div class="step">
+                <span class="step-number">1</span>
+                <strong>Open the Game</strong><br>
+                Open <span class="highlight">index.html</span> in your web browser
+            </div>
+
+            <div class="step">
+                <span class="step-number">2</span>
+                <strong>Generate Terrain</strong><br>
+                Click the <span class="highlight">"Generate Terrain"</span> button to create a random world
+            </div>
+
+            <div class="step">
+                <span class="step-number">3</span>
+                <strong>Spawn Creatures</strong><br>
+                Click a creature icon (👤 👳 🧔 👹), then click on the map to spawn them
+            </div>
+
+            <div class="step">
+                <span class="step-number">4</span>
+                <strong>Watch Them Live</strong><br>
+                See creatures move, find food, breed, and build civilizations!
+            </div>
+
+            <div class="step">
+                <span class="step-number">5</span>
+                <strong>Have Fun!</strong><br>
+                Paint terrain, trigger disasters, or just observe the chaos
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🎨 Terrain Types</h2>
+            <table>
+                <tr>
+                    <th>Terrain</th>
+                    <th>Icon</th>
+                    <th>Purpose</th>
+                </tr>
+                <tr>
+                    <td>Grass</td>
+                    <td>🌱</td>
+                    <td>Basic fertile ground - creatures thrive here</td>
+                </tr>
+                <tr>
+                    <td>Dirt</td>
+                    <td>🟫</td>
+                    <td>Soft ground - neutral terrain</td>
+                </tr>
+                <tr>
+                    <td>Stone</td>
+                    <td>⬜</td>
+                    <td>Hard rock - barriers and foundations</td>
+                </tr>
+                <tr>
+                    <td>Sand</td>
+                    <td>🟨</td>
+                    <td>Desert terrain - creatures move slower</td>
+                </tr>
+                <tr>
+                    <td>Water</td>
+                    <td>💧</td>
+                    <td>Liquid barrier - slows creatures down</td>
+                </tr>
+                <tr>
+                    <td>Lava</td>
+                    <td>🔥</td>
+                    <td>Deadly hazard - damages creatures</td>
+                </tr>
+                <tr>
+                    <td>Forest</td>
+                    <td>🌲</td>
+                    <td>Dense vegetation - attracts creatures</td>
+                </tr>
+                <tr>
+                    <td>Mountain</td>
+                    <td>⛰️</td>
+                    <td>High elevation - natural barriers</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>👥 Creatures</h2>
+            <ul class="feature-list">
+                <li><strong>Humans 👤</strong> - Balanced, adaptable creatures</li>
+                <li><strong>Elves 👳</strong> - Quick and graceful, prefer forests</li>
+                <li><strong>Dwarves 🧔</strong> - Strong and sturdy, prefer mountains</li>
+                <li><strong>Orcs 👹</strong> - Aggressive and powerful warriors</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>💥 Hazards & Disasters</h2>
+            <ul class="feature-list">
+                <li><strong>Meteor ☄️</strong> - Creates lava crater, destroys creatures nearby</li>
+                <li><strong>Plague ☠️</strong> - Damages all creatures in radius</li>
+                <li><strong>Lightning ⚡</strong> - Devastates terrain in a line</li>
+                <li><strong>Volcano 🌋</strong> - Massive lava eruption with huge impact</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>🎮 Controls</h2>
+            <div class="control-box">
+                <strong>Drawing Terrain:</strong><br>
+                1. Select a terrain type from the sidebar<br>
+                2. Adjust brush size with the slider<br>
+                3. Click and drag on the map to paint
+            </div>
+
+            <div class="control-box">
+                <strong>Spawning Creatures:</strong><br>
+                1. Click a creature icon<br>
+                2. Click on the map where you want them to spawn<br>
+                3. Multiple creatures will spawn in a cluster
+            </div>
+
+            <div class="control-box">
+                <strong>Triggering Hazards:</strong><br>
+                1. Click a hazard icon<br>
+                2. Click on the map to trigger the disaster<br>
+                3. Watch the effects unfold!
+            </div>
+
+            <div class="control-box">
+                <strong>Game Controls:</strong><br>
+                • <strong>Pause Button</strong> - Pause/resume simulation<br>
+                • <strong>Speed Slider</strong> - Adjust game speed (0.1x to 3x)<br>
+                • <strong>Generate Terrain</strong> - Create random world<br>
+                • <strong>Clear World</strong> - Remove all creatures<br>
+                • <strong>Reset</strong> - Start fresh with new terrain
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>📊 Understanding the UI</h2>
+            <h3>Sidebar (Left)</h3>
+            <ul class="feature-list">
+                <li>Terrain and creature selection</li>
+                <li>Speed and brush size controls</li>
+                <li>Hazard triggers</li>
+                <li>Live population statistics</li>
+                <li>Action buttons</li>
+            </ul>
+
+            <h3>Canvas (Center)</h3>
+            <ul class="feature-list">
+                <li>Main game world</li>
+                <li>Crosshair shows cursor position</li>
+                <li>Green border indicates selected area</li>
+            </ul>
+
+            <h3>Status Bar (Bottom)</h3>
+            <ul class="feature-list">
+                <li>Current mouse position (X, Y)</li>
+                <li>Real-time FPS counter</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>💡 Gameplay Tips</h2>
+            
+            <div class="tips">
+                <strong>💧 Tip 1: Water as Barriers</strong><br>
+                Use water to separate different civilizations and create natural boundaries
+            </div>
+
+            <div class="tips">
+                <strong>🏔️ Tip 2: Natural Habitats</strong><br>
+                Elves prefer forests, Dwarves like mountains - design terrain to encourage settlement
+            </div>
+
+            <div class="tips">
+                <strong>⏸️ Tip 3: Use Pause</strong><br>
+                Pause the game to plan large terrain changes or observe specific creatures closely
+            </div>
+
+            <div class="tips">
+                <strong>📈 Tip 4: Monitor Population</strong><br>
+                Check the statistics panel regularly to see how civilizations are developing
+            </div>
+
+            <div class="tips">
+                <strong>⚡ Tip 5: Catastrophic Events</strong><br>
+                Balance creation and destruction - too many hazards and nothing survives!
+            </div>
+
+            <div class="tips">
+                <strong>🌱 Tip 6: Resource Distribution</strong><br>
+                Spread forests and grasslands to support large populations
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🎓 Advanced Features</h2>
+            <ul class="feature-list">
+                <li><strong>Creature AI</strong> - Autonomous movement and decision-making</li>
+                <li><strong>Energy System</strong> - Creatures consume energy to move and survive</li>
+                <li><strong>Reproduction</strong> - Well-fed creatures breed naturally</li>
+                <li><strong>Aging</strong> - Creatures age and eventually die</li>
+                <li><strong>Damage System</strong> - Hazards and lava cause health loss</li>
+                <li><strong>Particle Effects</strong> - Visual feedback for disasters</li>
+                <li><strong>Procedural Generation</strong> - Unique worlds every time</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>🐛 Troubleshooting</h2>
+            <div class="control-box">
+                <strong>Game Won't Load?</strong><br>
+                Make sure you have all three files in the same folder:<br>
+                index.html, styles.css, spriteGenerator.js, game.js
+            </div>
+
+            <div class="control-box">
+                <strong>Slow Performance?</strong><br>
+                Reduce the number of creatures or try slower game speed
+            </div>
+
+            <div class="control-box">
+                <strong>Creatures Not Moving?</strong><br>
+                Check if the game is paused - click the pause button to resume
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🎯 Challenges to Try</h2>
+            <ul class="feature-list">
+                <li>Create a world where all 4 species coexist peacefully</li>
+                <li>Build the largest civilization possible before triggering a meteor</li>
+                <li>Design a map with separated biomes for each species</li>
+                <li>Watch how long a population can survive on an island</li>
+                <li>Create a natural island world with minimal intervention</li>
+                <li>Challenge: Keep a civilization alive during constant disasters</li>
+            </ul>
+        </div>
+
+        <a href="index.html" class="start-btn">🎮 Launch Game!</a>
+
+        <div class="footer">
+            <p>Worldbox Clone v1.0 | Built with ❤️ using vanilla JavaScript</p>
+            <p>No external libraries or dependencies required</p>
+        </div>
+    </div>
+</body>
+</html>
