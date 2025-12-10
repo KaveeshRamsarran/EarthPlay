@@ -165,7 +165,7 @@ This project demonstrates:
 
 ## 📝 License
 
-Free to use, modify, and distribute!
+All rights belong to https://www.superworldbox.com/, this is just a personal project re-creation of the creator's game
 
 ## 🎉 Enjoy!
 
