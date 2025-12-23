@@ -4,36 +4,47 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EarthPlay - Divine Civilization Simulator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <!-- Launcher Screen -->
     <div id="launcherScreen" class="launcher-screen">
         <div class="launcher-content">
-            <h1>🌍 Earthplay</h1>
-            <p>World Simulator</p>
+            <div class="launcher-logo">
+                <span class="logo-earth">EARTH</span><span class="logo-play">PLAY</span>
+            </div>
+            <p class="launcher-subtitle">World Simulator</p>
             
             <div class="launcher-section">
                 <h3>World Size</h3>
                 <div class="button-group">
-                    <button class="launcher-btn" data-size="small">Small (1600x1200)</button>
-                    <button class="launcher-btn selected" data-size="medium" style="background-color: #4CAF50; color: #000; border-color: #4CAF50;">Medium (2400x1800)</button>
-                    <button class="launcher-btn" data-size="large">Large (3200x2400)</button>
-                    <button class="launcher-btn" data-size="huge">Huge (4000x3000)</button>
+                    <button class="launcher-btn" data-size="small">Small</button>
+                    <button class="launcher-btn selected" data-size="medium">Medium</button>
+                    <button class="launcher-btn" data-size="large">Large</button>
+                    <button class="launcher-btn" data-size="huge">Huge</button>
                 </div>
             </div>
 
             <div class="launcher-section">
                 <h3>World Shape</h3>
                 <div class="button-group">
-                    <button class="launcher-btn selected" data-shape="rectangular" style="background-color: #4CAF50; color: #000; border-color: #4CAF50;">Rectangular</button>
+                    <button class="launcher-btn selected" data-shape="rectangular">Rectangular</button>
                     <button class="launcher-btn" data-shape="circular">Circular</button>
                     <button class="launcher-btn" data-shape="island">Island</button>
                     <button class="launcher-btn" data-shape="archipelago">Archipelago</button>
                 </div>
             </div>
 
-            <button id="startGameBtn" class="start-btn">START GAME</button>
+            <div class="launcher-section">
+                <h3>World Seed (Optional)</h3>
+                <input type="text" id="worldSeed" placeholder="Leave empty for random seed">
+            </div>
+
+            <button id="startGameBtn" class="start-btn">
+                <span class="btn-text">START GAME</span>
+                <span class="btn-glow"></span>
+            </button>
         </div>
     </div>
 
@@ -56,29 +67,74 @@
             <div class="bottom-sidebar">
                 <!-- Tab Navigation -->
                 <div class="tab-navigation">
-                    <button class="tab-btn active" data-tab="terrain">🌱 Terrain</button>
-                    <button class="tab-btn" data-tab="creatures">👤 Creatures</button>
-                    <button class="tab-btn" data-tab="civilizations">👑 Civilizations</button>
-                    <button class="tab-btn" data-tab="powers">⚡ Divine Powers</button>
-                    <button class="tab-btn" data-tab="hazards">☠️ Hazards</button>
-                    <button class="tab-btn" data-tab="stats">📊 Stats</button>
-                    <button class="tab-btn" data-tab="tools">🛠️ Tools</button>
+                    <button class="tab-btn active" data-tab="terrain">
+                        <canvas class="tab-icon" data-icon="terrain_tab"></canvas>
+                        <span>Terrain</span>
+                    </button>
+                    <button class="tab-btn" data-tab="creatures">
+                        <canvas class="tab-icon" data-icon="creatures_tab"></canvas>
+                        <span>Creatures</span>
+                    </button>
+                    <button class="tab-btn" data-tab="civilizations">
+                        <canvas class="tab-icon" data-icon="civilizations_tab"></canvas>
+                        <span>Kingdoms</span>
+                    </button>
+                    <button class="tab-btn" data-tab="powers">
+                        <canvas class="tab-icon" data-icon="powers_tab"></canvas>
+                        <span>Powers</span>
+                    </button>
+                    <button class="tab-btn" data-tab="hazards">
+                        <canvas class="tab-icon" data-icon="hazards_tab"></canvas>
+                        <span>Hazards</span>
+                    </button>
+                    <button class="tab-btn" data-tab="stats">
+                        <canvas class="tab-icon" data-icon="stats_tab"></canvas>
+                        <span>Stats</span>
+                    </button>
+                    <button class="tab-btn" data-tab="tools">
+                        <canvas class="tab-icon" data-icon="tools_tab"></canvas>
+                        <span>Tools</span>
+                    </button>
                 </div>
 
                 <!-- Tab Content -->
                 <div class="tabs-container">
                     <!-- Terrain Tab -->
                     <div class="tab-content active" id="terrain-tab">
-                        <div class="tab-header">🌱 Terrain Tools</div>
+                        <div class="tab-header">Terrain Tools</div>
                         <div class="tool-grid">
-                            <button class="brush-btn selected" data-brush="grass" title="Grass">🌱</button>
-                            <button class="brush-btn" data-brush="dirt" title="Dirt">🟫</button>
-                            <button class="brush-btn" data-brush="stone" title="Stone">⬜</button>
-                            <button class="brush-btn" data-brush="sand" title="Sand">🟨</button>
-                            <button class="brush-btn" data-brush="water" title="Water">💧</button>
-                            <button class="brush-btn" data-brush="lava" title="Lava">🔥</button>
-                            <button class="brush-btn" data-brush="forest" title="Forest">🌲</button>
-                            <button class="brush-btn" data-brush="mountain" title="Mountain">⛰️</button>
+                            <button class="brush-btn selected" data-brush="grass" title="Grass">
+                                <canvas class="btn-icon" data-icon="grass"></canvas>
+                                <span class="btn-label">Grass</span>
+                            </button>
+                            <button class="brush-btn" data-brush="dirt" title="Dirt">
+                                <canvas class="btn-icon" data-icon="dirt"></canvas>
+                                <span class="btn-label">Dirt</span>
+                            </button>
+                            <button class="brush-btn" data-brush="stone" title="Stone">
+                                <canvas class="btn-icon" data-icon="stone"></canvas>
+                                <span class="btn-label">Stone</span>
+                            </button>
+                            <button class="brush-btn" data-brush="sand" title="Sand">
+                                <canvas class="btn-icon" data-icon="sand"></canvas>
+                                <span class="btn-label">Sand</span>
+                            </button>
+                            <button class="brush-btn" data-brush="water" title="Water">
+                                <canvas class="btn-icon" data-icon="water"></canvas>
+                                <span class="btn-label">Water</span>
+                            </button>
+                            <button class="brush-btn" data-brush="lava" title="Lava">
+                                <canvas class="btn-icon" data-icon="lava"></canvas>
+                                <span class="btn-label">Lava</span>
+                            </button>
+                            <button class="brush-btn" data-brush="forest" title="Forest">
+                                <canvas class="btn-icon" data-icon="forest"></canvas>
+                                <span class="btn-label">Forest</span>
+                            </button>
+                            <button class="brush-btn" data-brush="mountain" title="Mountain">
+                                <canvas class="btn-icon" data-icon="mountain"></canvas>
+                                <span class="btn-label">Mountain</span>
+                            </button>
                         </div>
                         <div class="control-section">
                             <label>Brush Size: <span id="brushSizeDisplay">3</span></label>
@@ -88,55 +144,127 @@
 
                     <!-- Creatures Tab -->
                     <div class="tab-content" id="creatures-tab">
-                        <div class="tab-header">👤 Creature Tools</div>
+                        <div class="tab-header">Creature Tools</div>
                         <div class="tool-grid">
-                            <button class="creature-btn" data-creature="human" title="Humans">👤</button>
-                            <button class="creature-btn" data-creature="elf" title="Elves">👳</button>
-                            <button class="creature-btn" data-creature="dwarf" title="Dwarves">🧔</button>
-                            <button class="creature-btn" data-creature="orc" title="Orcs">👹</button>
-                            <button class="creature-btn" data-creature="undead" title="Undead">💀</button>
-                            <button class="creature-btn" data-creature="wolf" title="Wolves">🐺</button>
-                            <button class="creature-btn" data-creature="bear" title="Bears">🐻</button>
-                            <button class="creature-btn" data-creature="deer" title="Deer">🦌</button>
-                            <button class="creature-btn" data-creature="eagle" title="Eagles">🦅</button>
-                            <button class="creature-btn" data-creature="fish" title="Fish">🐟</button>
+                            <button class="creature-btn" data-creature="human" title="Humans">
+                                <canvas class="btn-icon" data-icon="human"></canvas>
+                                <span class="btn-label">Human</span>
+                            </button>
+                            <button class="creature-btn" data-creature="elf" title="Elves">
+                                <canvas class="btn-icon" data-icon="elf"></canvas>
+                                <span class="btn-label">Elf</span>
+                            </button>
+                            <button class="creature-btn" data-creature="dwarf" title="Dwarves">
+                                <canvas class="btn-icon" data-icon="dwarf"></canvas>
+                                <span class="btn-label">Dwarf</span>
+                            </button>
+                            <button class="creature-btn" data-creature="orc" title="Orcs">
+                                <canvas class="btn-icon" data-icon="orc"></canvas>
+                                <span class="btn-label">Orc</span>
+                            </button>
+                            <button class="creature-btn" data-creature="undead" title="Undead">
+                                <canvas class="btn-icon" data-icon="undead"></canvas>
+                                <span class="btn-label">Undead</span>
+                            </button>
+                            <button class="creature-btn" data-creature="wolf" title="Wolves">
+                                <canvas class="btn-icon" data-icon="wolf"></canvas>
+                                <span class="btn-label">Wolf</span>
+                            </button>
+                            <button class="creature-btn" data-creature="bear" title="Bears">
+                                <canvas class="btn-icon" data-icon="bear"></canvas>
+                                <span class="btn-label">Bear</span>
+                            </button>
+                            <button class="creature-btn" data-creature="deer" title="Deer">
+                                <canvas class="btn-icon" data-icon="deer"></canvas>
+                                <span class="btn-label">Deer</span>
+                            </button>
+                            <button class="creature-btn" data-creature="eagle" title="Eagles">
+                                <canvas class="btn-icon" data-icon="eagle"></canvas>
+                                <span class="btn-label">Eagle</span>
+                            </button>
+                            <button class="creature-btn" data-creature="fish" title="Fish">
+                                <canvas class="btn-icon" data-icon="fish"></canvas>
+                                <span class="btn-label">Fish</span>
+                            </button>
                         </div>
                     </div>
 
                     <!-- Civilizations Tab -->
                     <div class="tab-content" id="civilizations-tab">
-                        <div class="tab-header">👑 Civilizations & Kingdoms</div>
+                        <div class="tab-header">Civilizations & Kingdoms</div>
                         <div class="control-section">
                             <h4>Active Kingdoms</h4>
-                            <div id="kingdomsList" style="max-height: 200px; overflow-y: auto;">
-                                <p style="color: #999;">No kingdoms yet. Spawn races to create civilizations!</p>
+                            <div id="kingdomsList" class="kingdoms-list">
+                                <p class="no-kingdoms">No kingdoms yet. Spawn races to create civilizations!</p>
                             </div>
                         </div>
                         <div class="control-section">
                             <h4>Create Kingdom</h4>
-                            <div class="tool-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
-                                <button class="kingdom-btn" data-kingdom="human" title="Human Kingdom">👤</button>
-                                <button class="kingdom-btn" data-kingdom="elf" title="Elf Kingdom">👳</button>
-                                <button class="kingdom-btn" data-kingdom="dwarf" title="Dwarf Kingdom">🧔</button>
-                                <button class="kingdom-btn" data-kingdom="orc" title="Orc Kingdom">👹</button>
+                            <div class="tool-grid kingdom-grid">
+                                <button class="kingdom-btn" data-kingdom="human" title="Human Kingdom">
+                                    <canvas class="btn-icon" data-icon="human"></canvas>
+                                    <span class="btn-label">Human</span>
+                                </button>
+                                <button class="kingdom-btn" data-kingdom="elf" title="Elf Kingdom">
+                                    <canvas class="btn-icon" data-icon="elf"></canvas>
+                                    <span class="btn-label">Elf</span>
+                                </button>
+                                <button class="kingdom-btn" data-kingdom="dwarf" title="Dwarf Kingdom">
+                                    <canvas class="btn-icon" data-icon="dwarf"></canvas>
+                                    <span class="btn-label">Dwarf</span>
+                                </button>
+                                <button class="kingdom-btn" data-kingdom="orc" title="Orc Kingdom">
+                                    <canvas class="btn-icon" data-icon="orc"></canvas>
+                                    <span class="btn-label">Orc</span>
+                                </button>
                             </div>
                         </div>
                     </div>
 
                     <!-- Divine Powers Tab -->
                     <div class="tab-content" id="powers-tab">
-                        <div class="tab-header">⚡ Divine Powers</div>
-                        <div class="tool-grid">
-                            <button class="power-btn" data-power="meteor" title="Meteor Strike">☄️</button>
-                            <button class="power-btn" data-power="nuke" title="Nuclear Explosion">💣</button>
-                            <button class="power-btn" data-power="dragon" title="Dragon Strike">🐉</button>
-                            <button class="power-btn" data-power="ufo" title="UFO Abduction">🛸</button>
-                            <button class="power-btn" data-power="plague" title="Plague">☠️</button>
-                            <button class="power-btn" data-power="tsunami" title="Tsunami">🌊</button>
-                            <button class="power-btn" data-power="lightning" title="Lightning Storm">⚡</button>
-                            <button class="power-btn" data-power="volcano" title="Volcano Eruption">🌋</button>
-                            <button class="power-btn" data-power="earthquake" title="Earthquake">📍</button>
-                            <button class="power-btn" data-power="wildfire" title="Wildfire">🔥</button>
+                        <div class="tab-header">Divine Powers</div>
+                        <div class="tool-grid power-grid">
+                            <button class="power-btn" data-power="meteor" title="Meteor Strike">
+                                <canvas class="btn-icon" data-icon="meteor"></canvas>
+                                <span class="btn-label">Meteor</span>
+                            </button>
+                            <button class="power-btn" data-power="nuke" title="Nuclear Explosion">
+                                <canvas class="btn-icon" data-icon="nuke"></canvas>
+                                <span class="btn-label">Nuke</span>
+                            </button>
+                            <button class="power-btn" data-power="dragon" title="Dragon Strike">
+                                <canvas class="btn-icon" data-icon="dragon"></canvas>
+                                <span class="btn-label">Dragon</span>
+                            </button>
+                            <button class="power-btn" data-power="ufo" title="UFO Abduction">
+                                <canvas class="btn-icon" data-icon="ufo"></canvas>
+                                <span class="btn-label">UFO</span>
+                            </button>
+                            <button class="power-btn" data-power="plague" title="Plague">
+                                <canvas class="btn-icon" data-icon="plague"></canvas>
+                                <span class="btn-label">Plague</span>
+                            </button>
+                            <button class="power-btn" data-power="tsunami" title="Tsunami">
+                                <canvas class="btn-icon" data-icon="tsunami"></canvas>
+                                <span class="btn-label">Tsunami</span>
+                            </button>
+                            <button class="power-btn" data-power="lightning" title="Lightning Storm">
+                                <canvas class="btn-icon" data-icon="lightning"></canvas>
+                                <span class="btn-label">Lightning</span>
+                            </button>
+                            <button class="power-btn" data-power="volcano" title="Volcano Eruption">
+                                <canvas class="btn-icon" data-icon="volcano"></canvas>
+                                <span class="btn-label">Volcano</span>
+                            </button>
+                            <button class="power-btn" data-power="earthquake" title="Earthquake">
+                                <canvas class="btn-icon" data-icon="earthquake"></canvas>
+                                <span class="btn-label">Quake</span>
+                            </button>
+                            <button class="power-btn" data-power="wildfire" title="Wildfire">
+                                <canvas class="btn-icon" data-icon="wildfire"></canvas>
+                                <span class="btn-label">Fire</span>
+                            </button>
                         </div>
                         <div class="control-section" id="powerCooldownsContainer">
                         </div>
@@ -144,22 +272,46 @@
 
                     <!-- Hazards Tab -->
                     <div class="tab-content" id="hazards-tab">
-                        <div class="tab-header">☠️ Natural Hazards</div>
+                        <div class="tab-header">Natural Hazards</div>
                         <div class="tool-grid">
-                            <button class="hazard-btn" data-hazard="meteor" title="Meteor">☄️</button>
-                            <button class="hazard-btn" data-hazard="plague" title="Plague">☠️</button>
-                            <button class="hazard-btn" data-hazard="lightning" title="Lightning">⚡</button>
-                            <button class="hazard-btn" data-hazard="volcano" title="Volcano">🌋</button>
-                            <button class="hazard-btn" data-hazard="tsunami" title="Tsunami">🌊</button>
-                            <button class="hazard-btn" data-hazard="blizzard" title="Blizzard">❄️</button>
-                            <button class="hazard-btn" data-hazard="earthquake" title="Earthquake">📍</button>
-                            <button class="hazard-btn" data-hazard="wildfire" title="Wildfire">🔥</button>
+                            <button class="hazard-btn" data-hazard="meteor" title="Meteor">
+                                <canvas class="btn-icon" data-icon="meteor"></canvas>
+                                <span class="btn-label">Meteor</span>
+                            </button>
+                            <button class="hazard-btn" data-hazard="plague" title="Plague">
+                                <canvas class="btn-icon" data-icon="plague"></canvas>
+                                <span class="btn-label">Plague</span>
+                            </button>
+                            <button class="hazard-btn" data-hazard="lightning" title="Lightning">
+                                <canvas class="btn-icon" data-icon="lightning"></canvas>
+                                <span class="btn-label">Lightning</span>
+                            </button>
+                            <button class="hazard-btn" data-hazard="volcano" title="Volcano">
+                                <canvas class="btn-icon" data-icon="volcano"></canvas>
+                                <span class="btn-label">Volcano</span>
+                            </button>
+                            <button class="hazard-btn" data-hazard="tsunami" title="Tsunami">
+                                <canvas class="btn-icon" data-icon="tsunami"></canvas>
+                                <span class="btn-label">Tsunami</span>
+                            </button>
+                            <button class="hazard-btn" data-hazard="blizzard" title="Blizzard">
+                                <canvas class="btn-icon" data-icon="blizzard"></canvas>
+                                <span class="btn-label">Blizzard</span>
+                            </button>
+                            <button class="hazard-btn" data-hazard="earthquake" title="Earthquake">
+                                <canvas class="btn-icon" data-icon="earthquake"></canvas>
+                                <span class="btn-label">Quake</span>
+                            </button>
+                            <button class="hazard-btn" data-hazard="wildfire" title="Wildfire">
+                                <canvas class="btn-icon" data-icon="wildfire"></canvas>
+                                <span class="btn-label">Fire</span>
+                            </button>
                         </div>
                     </div>
 
                     <!-- Stats Tab -->
                     <div class="tab-content" id="stats-tab">
-                        <div class="tab-header">📊 World Statistics</div>
+                        <div class="tab-header">World Statistics</div>
                         <div class="stats-grid">
                             <div class="stat-item"><span class="stat-label">Population:</span><span class="stat-value" id="populationCount">0</span></div>
                             <div class="stat-item"><span class="stat-label">Humans:</span><span class="stat-value" id="humanCount">0</span></div>
@@ -172,18 +324,55 @@
                             <div class="stat-item"><span class="stat-label">Deer:</span><span class="stat-value" id="deerCount">0</span></div>
                             <div class="stat-item"><span class="stat-label">Eagles:</span><span class="stat-value" id="eagleCount">0</span></div>
                             <div class="stat-item"><span class="stat-label">Fish:</span><span class="stat-value" id="fishCount">0</span></div>
-                            <div class="stat-item"><span class="stat-label">Year:</span><span class="stat-value" id="yearCount">0</span></div>
+                            <div class="stat-item year-stat"><span class="stat-label">Year:</span><span class="stat-value" id="yearCount">0</span></div>
+                        </div>
+                        <div class="control-section">
+                            <label>Overlays:</label>
+                            <div class="overlay-buttons">
+                                <button class="tool-btn overlay-btn" data-overlay="biome" title="Show Biome Colors">
+                                    <canvas class="btn-icon small" data-icon="biome"></canvas>
+                                    <span>Biome</span>
+                                </button>
+                                <button class="tool-btn overlay-btn" data-overlay="population" title="Population Density">
+                                    <canvas class="btn-icon small" data-icon="population"></canvas>
+                                    <span>Pop</span>
+                                </button>
+                                <button class="tool-btn overlay-btn" data-overlay="temperature" title="Temperature">
+                                    <canvas class="btn-icon small" data-icon="temperature"></canvas>
+                                    <span>Temp</span>
+                                </button>
+                                <button class="tool-btn overlay-btn" data-overlay="kingdoms" title="Kingdom Borders">
+                                    <canvas class="btn-icon small" data-icon="kingdoms"></canvas>
+                                    <span>Realm</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
 
                     <!-- Tools Tab -->
                     <div class="tab-content" id="tools-tab">
-                        <div class="tab-header">🛠️ Game Tools</div>
+                        <div class="tab-header">Game Tools</div>
                         <div class="tool-buttons">
-                            <button class="tool-btn" data-tool="pause">⏸️ Pause</button>
-                            <button class="tool-btn" id="clearBtn">🗑️ Clear</button>
-                            <button class="tool-btn" id="generateBtn">🌍 Generate</button>
-                            <button class="tool-btn" id="resetBtn">🔄 Reset</button>
+                            <button class="tool-btn" data-tool="pause">
+                                <canvas class="btn-icon small" data-icon="pause"></canvas>
+                                <span>Pause</span>
+                            </button>
+                            <button class="tool-btn" id="stepBtn">
+                                <canvas class="btn-icon small" data-icon="step"></canvas>
+                                <span>Step</span>
+                            </button>
+                            <button class="tool-btn" id="clearBtn">
+                                <canvas class="btn-icon small" data-icon="clear"></canvas>
+                                <span>Clear</span>
+                            </button>
+                            <button class="tool-btn" id="generateBtn">
+                                <canvas class="btn-icon small" data-icon="generate"></canvas>
+                                <span>Generate</span>
+                            </button>
+                            <button class="tool-btn" id="resetBtn">
+                                <canvas class="btn-icon small" data-icon="reset"></canvas>
+                                <span>Reset</span>
+                            </button>
                         </div>
                         <div class="control-section">
                             <label>Game Speed:</label>
@@ -192,6 +381,22 @@
                                 <span id="speedDisplay">1x</span>
                             </div>
                         </div>
+                        <div class="control-section">
+                            <label>Save / Load:</label>
+                            <div class="save-load-buttons">
+                                <button class="tool-btn save-btn" id="saveBtn">
+                                    <canvas class="btn-icon small" data-icon="save"></canvas>
+                                    <span>Save</span>
+                                </button>
+                                <button class="tool-btn load-btn" id="loadBtn">
+                                    <canvas class="btn-icon small" data-icon="load"></canvas>
+                                    <span>Load</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="control-section">
+                            <label>World Seed: <span id="seedDisplay" class="seed-display"></span></label>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -199,7 +404,7 @@
 
         <!-- Game Controls & Shortcuts -->
         <div class="game-controls-panel">
-            <div class="controls-header">⌨️ CONTROLS & SHORTCUTS</div>
+            <div class="controls-header">CONTROLS & SHORTCUTS</div>
             <div class="controls-grid">
                 <div class="control-item">
                     <div class="control-key">SCROLL</div>
@@ -214,20 +419,36 @@
                     <div class="control-desc">Place/Cast</div>
                 </div>
                 <div class="control-item">
-                    <div class="control-key">+/- KEY</div>
-                    <div class="control-desc">Zoom To Center</div>
+                    <div class="control-key">ARROW KEYS</div>
+                    <div class="control-desc">Pan Camera</div>
                 </div>
                 <div class="control-item">
                     <div class="control-key">SPACE</div>
                     <div class="control-desc">Pause Game</div>
                 </div>
                 <div class="control-item">
+                    <div class="control-key">. (PERIOD)</div>
+                    <div class="control-desc">Step One Tick</div>
+                </div>
+                <div class="control-item">
                     <div class="control-key">TAB</div>
                     <div class="control-desc">Cycle Tabs</div>
                 </div>
+                <div class="control-item">
+                    <div class="control-key">1-4</div>
+                    <div class="control-desc">Set Speed</div>
+                </div>
+                <div class="control-item">
+                    <div class="control-key">CTRL+S</div>
+                    <div class="control-desc">Quick Save</div>
+                </div>
+                <div class="control-item">
+                    <div class="control-key">CTRL+L</div>
+                    <div class="control-desc">Quick Load</div>
+                </div>
             </div>
             <div class="controls-info">
-                💡 TIP: Create kingdoms → Cast divine powers → Watch civilizations battle!
+                TIP: Create kingdoms → Cast divine powers → Watch civilizations battle!
             </div>
         </div>
     </div>
