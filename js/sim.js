@@ -11,7 +11,7 @@ class Sim extends EP.Emitter {
     constructor(opts = {}) {
         super();
         const size = EP.WORLD_SIZES[opts.size] || EP.WORLD_SIZES.medium;
-        this.opts = Object.assign({ size: 'medium', shape: 'continent', sea: 'normal', life: 'civ' }, opts);
+        this.opts = Object.assign({ size: 'medium', shape: 'continent', sea: 'normal', life: 'civ', disasters: 'rare' }, opts);
         this.seed = (opts.seed >>> 0) || ((Math.random() * 1e9) >>> 0);
         this.opts.seed = this.seed;
         const w = opts.w || size.w, h = opts.h || size.h;
@@ -68,7 +68,7 @@ class Sim extends EP.Emitter {
         this.powers.update();
         this.updateProjectiles();
         this.fx.update();
-        if (this.tick % 600 === 0) this.migrate();
+        if (this.tick % 600 === 0) { this.migrate(); this.naturalEvents(); }
         if (this.pending.length) { const p = this.pending; this.pending = []; for (const f of p) f(); }
         if (this.deadCount) { this.units = this.units.filter(u => !u.dead); this.deadCount = 0; }
     }
@@ -87,10 +87,11 @@ class Sim extends EP.Emitter {
     shoot(kind, x, y, tx, ty, dmg, src, targetId, kid) {
         const d = Math.hypot(tx - x, ty - y);
         this.projectiles.push({
-            kind, x, y, sx: x, sy: y, tx, ty, t: 0, dur: Math.max(6, Math.round(d / (kind === 'arrow' ? 0.45 : 0.28))),
+            kind, x, y, sx: x, sy: y, tx, ty, t: 0, dur: Math.max(kind === 'laser' ? 3 : 6, Math.round(d / (kind === 'arrow' ? 0.45 : kind === 'laser' ? 1.1 : 0.28))),
             dmg, srcId: src ? src.id : -1, targetId, kid: kid != null ? kid : (src ? src.kingdomId : -1),
         });
         if (kind === 'fireball') this.emit('sfx', { name: 'fireball', x, y });
+        else if (kind === 'laser') this.emit('sfx', { name: 'zap', x, y, quiet: true });
     }
     updateProjectiles() {
         const P = this.projectiles;
@@ -106,6 +107,12 @@ class Sim extends EP.Emitter {
             if (p.kind === 'arrow') {
                 const tgt = this.unitMap.get(p.targetId);
                 if (tgt && !tgt.dead && Math.hypot(tgt.x - p.tx, tgt.y - p.ty) < 1.4) Units.damage(this, tgt, p.dmg, src);
+            } else if (p.kind === 'laser') {
+                const tgt = this.unitMap.get(p.targetId);
+                if (tgt && !tgt.dead && Math.hypot(tgt.x - p.tx, tgt.y - p.ty) < 1.6) Units.damage(this, tgt, p.dmg, src, 'vaporised');
+                const w = this.world;
+                if (p.targetId < 0 && w.inb(p.tx | 0, p.ty | 0)) { const b = w.bld[w.idx(p.tx | 0, p.ty | 0)]; if (b >= 0) this.civ.damageBuilding(b, p.dmg, src); }
+                this.fx.burst(p.tx, p.ty, 6, { colors: ['#9fffb0', '#ffffff', '#7dd3fc'], speed: 0.05, life: 16, glow: true });
             } else {
                 for (const u of this.grid.collect(p.tx, p.ty, 1.6, u => u.kind !== 'monster')) Units.damage(this, u, p.dmg, src, 'dragonfire');
                 for (let k = 0; k < 3; k++) this.env.ignite(p.tx + this.rng.int(-1, 1), p.ty + this.rng.int(-1, 1));
@@ -127,18 +134,70 @@ class Sim extends EP.Emitter {
     migrate() {
         if (this.opts.life === 'empty' && !this.migrated) return;
         const w = this.world, rng = this.rng, area = w.w * w.h;
-        const habitat = { deer: [T.GRASS, T.HILLS], sheep: [T.GRASS, T.SAVANNA], rabbit: [T.GRASS, T.SAVANNA, T.SNOW], wolf: [T.GRASS, T.SNOW, T.HILLS], bear: [T.HILLS, T.SNOW, T.GRASS], fish: [T.DEEP, T.SHALLOW] };
-        for (const s in habitat) {
-            const min = Math.max(2, Math.round(SPECIES[s].cap * area * 0.08));
+        let tiles = null;
+        for (const s of EP.WILD) {
+            const sp = SPECIES[s];
+            const min = Math.max(2, Math.round(sp.cap * area * 0.08));
             if ((this.speciesCount[s] || 0) >= min) continue;
-            for (let a = 0; a < 40; a++) {
-                const x = rng.int(0, w.w - 1), y = rng.int(0, w.h - 1), i = w.idx(x, y);
-                if (!habitat[s].includes(w.terrain[i]) || w.owner[i] >= 0) continue;
-                const n = SPECIES[s].herd ? rng.int(2, 4) : 1;
+            if (!tiles) tiles = this.tilesByTerrain();
+            const pool = sp.habitat.reduce((n, t) => n + tiles[t].length, 0);
+            for (let a = 0; a < 12 && pool; a++) {
+                const i = this.pickHabitatTile(tiles, sp.habitat, pool), x = i % w.w, y = (i / w.w) | 0;
+                if (w.owner[i] >= 0) continue;
+                const n = sp.herd ? rng.int(2, 4) : 1;
                 for (let g = 0; g < n; g++) this.spawnUnit(s, x + 0.5 + rng.float(-1, 1), y + 0.5 + rng.float(-1, 1), {});
                 break;
             }
         }
+    }
+
+    // Random disasters and visitors, if the world allows them.
+    naturalEvents() {
+        const lvl = EP.DISASTER_LEVELS[this.opts.disasters] || EP.DISASTER_LEVELS.off;
+        if (!lvl.p || !this.rng.chance(lvl.p)) return;
+        const w = this.world, rng = this.rng;
+        let x = -1, y = -1;
+        for (let a = 0; a < 60; a++) {
+            const tx = rng.int(4, w.w - 5), ty = rng.int(4, w.h - 5);
+            if (w.isLandI(w.idx(tx, ty)) && w.terrain[w.idx(tx, ty)] !== T.MOUNTAIN) { x = tx + 0.5; y = ty + 0.5; break; }
+        }
+        if (x < 0) return;
+        const c = this.civ.cityAt(x, y);
+        const where = c ? ` near ${c.name}` : '';
+        const ev = rng.pick(['meteor', 'meteor', 'tornado', 'tornado', 'quake', 'volcano', 'ufo', 'blizzard', 'dragon']);
+        const meta = { x, y, type: 'disaster' };
+        switch (ev) {
+            case 'meteor': this.powers.apply('meteor', x, y, 1); this.log(`A meteor fell from the sky${where}`, meta); break;
+            case 'tornado': this.powers.apply('tornado', x, y, 1); this.log(`A tornado touched down${where}`, meta); break;
+            case 'quake': this.powers.apply('quake', x, y, 1); this.log(`An earthquake shook the land${where}`, meta); break;
+            case 'volcano': this.powers.apply('volcano', x, y, 1); this.log(`A volcano erupted${where}`, meta); break;
+            case 'blizzard':
+                for (let k = 0; k < 6; k++) this.powers.apply('blizzard', x + rng.float(-4, 4), y + rng.float(-4, 4), 4);
+                for (let k = 0; k < 2; k++) this.spawnUnit('icegolem', x + rng.float(-2, 2), y + rng.float(-2, 2), {});
+                this.log(`A great blizzard swept in${where}, bringing ice golems`, meta);
+                break;
+            case 'ufo': {
+                const u = this.spawnUnit('ufo', x, y, {});
+                if (u) this.log(`A strange craft appeared in the sky${where}`, Object.assign({ unit: u.id }, meta));
+                break;
+            }
+            case 'dragon': {
+                if ((this.speciesCount.dragon || 0) > 0) break;
+                const u = this.spawnUnit('dragon', x, y, {});
+                if (u) this.log(`A dragon descended from the mountains${where}`, Object.assign({ unit: u.id }, meta));
+                break;
+            }
+        }
+    }
+    tilesByTerrain() {
+        const w = this.world, out = EP.TERRAIN.map(() => []);
+        for (let i = 0; i < w.w * w.h; i++) out[w.terrain[i]].push(i);
+        return out;
+    }
+    pickHabitatTile(tiles, habitat, pool) {
+        let r = this.rng.int(0, pool - 1);
+        for (const t of habitat) { if (r < tiles[t].length) return tiles[t][r]; r -= tiles[t].length; }
+        return tiles[habitat[0]][0];
     }
     census() {
         const pop = {};
@@ -149,8 +208,8 @@ class Sim extends EP.Emitter {
         const pop = this.census();
         const entry = { year: this.year, kingdoms: this.civ.aliveKingdoms().length };
         for (const r of EP.CIV_RACES) entry[r] = pop[r] || 0;
-        entry.animals = ['deer', 'sheep', 'rabbit', 'wolf', 'bear'].reduce((s, k) => s + (pop[k] || 0), 0);
-        entry.monsters = (pop.zombie || 0) + (pop.dragon || 0);
+        entry.animals = EP.ANIMALS.reduce((s, k) => s + (SPECIES[k].kind === 'animal' ? pop[k] || 0 : 0), 0);
+        entry.monsters = EP.MONSTERS.reduce((s, k) => s + (pop[k] || 0), 0);
         this.history.push(entry);
         if (this.history.length > 400) this.history.shift();
     }
@@ -160,20 +219,19 @@ class Sim extends EP.Emitter {
         if (life === 'empty') return;
         const w = this.world, rng = this.rng;
         const area = w.w * w.h;
-        const habitat = {
-            deer: [T.GRASS, T.HILLS], sheep: [T.GRASS, T.SAVANNA], rabbit: [T.GRASS, T.SAVANNA, T.SNOW],
-            wolf: [T.GRASS, T.SNOW, T.HILLS], bear: [T.HILLS, T.SNOW, T.GRASS], fish: [T.DEEP, T.SHALLOW],
-        };
-        for (const s in habitat) {
-            const target = Math.round(SPECIES[s].cap * area * 0.45);
+        const tiles = this.tilesByTerrain();
+        for (const s of EP.WILD) {
+            const sp = SPECIES[s];
+            const pool = sp.habitat.reduce((n, t) => n + tiles[t].length, 0);
+            // Rare biomes still get a few residents; vast ones are capped by the species' density.
+            const target = Math.min(Math.round(sp.cap * area * 0.45), Math.max(2, Math.round(pool * sp.cap * 6)));
             let spawned = 0, tries = 0;
-            while (spawned < target && tries++ < target * 20) {
-                const x = rng.int(0, w.w - 1), y = rng.int(0, w.h - 1);
-                if (!habitat[s].includes(w.t(x, y))) continue;
-                const group = SPECIES[s].herd ? rng.int(2, 5) : 1;
+            while (pool && spawned < target && tries++ < target * 20) {
+                const i = this.pickHabitatTile(tiles, sp.habitat, pool), x = i % w.w, y = (i / w.w) | 0;
+                const group = sp.herd ? rng.int(2, 5) : 1;
                 for (let g = 0; g < group && spawned < target; g++) {
                     const px = x + 0.5 + rng.float(-1.5, 1.5), py = y + 0.5 + rng.float(-1.5, 1.5);
-                    if (Units.passable(this, { species: s, kind: SPECIES[s].kind }, px, py) && this.spawnUnit(s, px, py, {})) spawned++;
+                    if (Units.passable(this, { species: s, kind: sp.kind }, px, py) && this.spawnUnit(s, px, py, {})) spawned++;
                 }
             }
         }

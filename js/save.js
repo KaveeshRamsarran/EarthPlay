@@ -50,7 +50,8 @@ const Save = EP.Save = {
 
     deserialize(d) {
         if (!d || !d.world || d.v > VERSION) throw new Error('Unrecognised save format');
-        const sim = new EP.Sim(Object.assign({}, d.opts, { blank: true, w: d.world.w, h: d.world.h, seed: d.seed }));
+        // Worlds saved before disasters existed keep a calm sky.
+        const sim = new EP.Sim(Object.assign({ disasters: 'off' }, d.opts, { blank: true, w: d.world.w, h: d.world.h, seed: d.seed }));
         const w = sim.world;
         w.terrain.set(fromB64(d.world.terrain)); w.height.set(fromB64(d.world.height));
         w.tree.set(fromB64(d.world.tree)); w.fire.set(fromB64(d.world.fire)); w.wear.set(fromB64(d.world.wear));

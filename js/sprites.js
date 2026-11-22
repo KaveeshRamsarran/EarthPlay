@@ -70,6 +70,63 @@ const T = {
     dragon: [[
         '..w.............', '..ww............', '..www........rr.', '...www......rrre', '....wwwrrrrrrryn', '...rrrrrrrrrry..', '.rrRrrrrrrrr....', 'rr..RRyyyyRR....', 'r....r.r..r.r...', '.....k.k..k.k...'], [
         '................', '................', '.............rr.', '............rrre', '....rrrrrrrrrryn', '...rrrrrrrrrry..', '.rrRwwwwwrrr....', 'rr..wwwwwwRR....', 'r....wwwr.r.r...', '.....k.k..k.k...']],
+    chicken: [[
+        '....r..', '...wwey', 'w..www.', 'wwwwww.', '.WWWW..', '..l.l..'], [
+        '....r..', '...wwey', 'w..www.', 'wwwwww.', '.WWWW..', '.l...l.']],
+    cow: [[
+        '........h.h', '........wew', 'wkkwwwkwwww', 'wwkkwwwwwpp', 'wwwwwkkww..', '.l.l..l.l..', '.k.k..k.k..'], [
+        '........h.h', '........wew', 'wkkwwwkwwww', 'wwkkwwwwwpp', 'wwwwwkkww..', 'l...l.l..l.', 'k...k.k..k.']],
+    buffalo: [[
+        '.......h..h', '.......hbbh', '..BBBBbbbbe', '.BBBBBBbbbn', 'bbbbbbbbbb.', 'bbbbbbbbb..', '.b.b..b.b..', '.k.k..k.k..'], [
+        '.......h..h', '.......hbbh', '..BBBBbbbbe', '.BBBBBBbbbn', 'bbbbbbbbbb.', 'bbbbbbbbb..', 'b...b.b..b.', 'k...k.k..k.']],
+    camel: [[
+        '........cc.', '........cec', '..cC....c..', '.cCCc..cc..', 'cccccccc...', '.cccccc....', '.l.l..l.l..', '.l.l..l.l..', '.k.k..k.k..'], [
+        '........cc.', '........cec', '..cC....c..', '.cCCc..cc..', 'cccccccc...', '.cccccc....', 'l...l.l..l.', 'l...l.l..l.', 'k...k.k..k.']],
+    penguin: [[
+        '.kkk.', 'kkkWy', 'kkww.', 'kwww.', 'kwww.', '.ww..', '.y.y.'], [
+        '.kkk.', 'kkkWy', 'kkwwk', 'kwww.', 'kwww.', '.ww..', 'y..y.']],
+    monkey: [[
+        '...mmm.', '...mfe.', '...mff.', '.m.mmm.', 'm..mmmf', 'm..m.m.', '.m.m.m.'], [
+        '...mmm.', '...mfe.', '...mff.', '.m.mmm.', 'm.fmmm.', 'm.m...m', '.mm...m']],
+    frog: [[
+        '...We.', '.gggg.', 'gGGgg.', 'g.g.g.'], [
+        '..We..', '.ggggg', 'gGGgg.', '.g..g.']],
+    turtle: [[
+        '.sSSs..', 'sSsSske', 'ssssss.', '.k..k..'], [
+        '.sSSs..', 'sSsSske', 'ssssss.', 'k...k..']],
+    crab: [[
+        '.e...e.', 'r.rrr.r', 'rrRRRrr', '.r.r.r.'], [
+        're...er', '.rrrrr.', 'rrRRRrr', 'r.r.r.r']],
+    bee: [[
+        '..ww..', 'kykyke', '.yky..'], [
+        '.ww...', 'kykyke', '.yky..']],
+    fox: [[
+        '.......o.o', '.......ooo', '.ooooooooe', 'Woooooooon', 'W.OOOWW...', '.l.l..l.l.', '.l.l..l.l.'], [
+        '.......o.o', '.......ooo', '.ooooooooe', 'Woooooooon', 'W.OOOWW...', 'l..l..l..l', 'l...l..l.l']],
+    hyena: [[
+        '.......g.g', '.......ggg', '.gGggGggge', 'gggGgggggn', 'g.GGGgg...', '.l.l..l.l.', '.l.l..l.l.'], [
+        '.......g.g', '.......ggg', '.gGggGggge', 'gggGgggggn', 'g.GGGgg...', 'l..l..l..l', 'l...l..l.l']],
+    crocodile: [[
+        '..c.c.c.ce..', 'cccccccccccc', '.CcccccccWWc', '..l....l....'], [
+        '..c.c.c.ce..', 'cccccccccccc', '.CcccccccWWc', '.l......l...']],
+    snake: [[
+        '......sSe', '.sS..s...', 's..sS....'], [
+        '......sSe', 's..sSs...', '.sS......']],
+    shark: [[
+        '.....g.....', '....ggg....', 'g.ggggggeg.', 'ggggggggggg', 'g..WWWWWW..'], [
+        '.....g.....', '....ggg....', '..ggggggeg.', 'gggggggggg.', '...WWWWWW..']],
+    skeleton: [[
+        '..bbb..', '.bbbbb.', '.bbbkb.', '..bbb..', '...b...', 'b.bbb.b', '..b.b..', '..bbb..', '..b.b..', '..b.b..'], [
+        '..bbb..', '.bbbbb.', '.bbbkb.', '..bbb..', '...b...', 'b.bbb.b', '..b.b..', '..bbb..', '.b...b.', '.b...b.']],
+    demon: [[
+        'h....h..', '.hrrrh..', '.rryry..', '..rrr...', 'rrRRRrr.', 'r.RRR.r.', '..RRR..t', '..r.r.tt', '..r.r...', '.kk.kk..'], [
+        'h....h..', '.hrrrh..', '.rryry..', '..rrr...', 'rrRRRrr.', 'r.RRR.r.', '..RRR..t', '.r...rtt', '.r...r..', 'kk...kk.']],
+    icegolem: [[
+        '...iiii...', '..iIIIIi..', '..iIcIci..', '..iIIIIi..', 'iiiiiiiiii', 'iIiIIIIiIi', 'iI.IIII.Ii', 'D..IIII..D', '...I..I...', '..II..II..', '..DD..DD..'], [
+        '...iiii...', '..iIIIIi..', '..iIcIci..', '..iIIIIi..', 'iiiiiiiiii', 'iIiIIIIiIi', 'iI.IIII.Ii', 'D..IIII..D', '..I....I..', '.II....II.', '.DD....DD.']],
+    ufo: [[
+        '.....dddd.....', '....dWdddd....', '..mmmmmmmmmm..', 'mmMMMMMMMMMMmm', '.mymmrmmymmrm.', '..MMMMMMMMMM..'], [
+        '.....dddd.....', '....dWdddd....', '..mmmmmmmmmm..', 'mmMMMMMMMMMMmm', '.mrmmymmrmmym.', '..MMMMMMMMMM..']],
 };
 
 const ANIMAL_PAL = {
@@ -81,6 +138,34 @@ const ANIMAL_PAL = {
     fish: { f: '#ffb44a', F: '#e08a2a', t: '#ff8a1f', e: '#1b1b1b' },
     dragon: { r: '#c6372b', R: '#8f2219', w: '#7a1f3a', y: '#ffcf5a', e: '#ffe066', n: '#3a0d0d', k: '#2a1010' },
     zombie: { h: '#3b3a2e', s: '#8fa874', e: '#d4202a', c: '#4a4f5c', C: '#33363f', l: '#3a3f4a', b: '#2a2a2a' },
+    chicken: { w: '#f7f3ea', W: '#d9d2c3', r: '#e8392b', e: '#1b1b1b', y: '#ffb43a', l: '#e89a2a' },
+    cow: { w: '#f5f1e8', k: '#2b2626', h: '#e8dcc0', e: '#1b1b1b', p: '#f2a0a8', l: '#d8d0c0' },
+    buffalo: { b: '#5a3a24', B: '#3f2818', h: '#efe4c8', e: '#e8d8b0', n: '#2a1a10', k: '#1e140c' },
+    camel: { c: '#d6a85c', C: '#e8c07a', e: '#1b1b1b', l: '#b88a48', k: '#5a4026' },
+    penguin: { k: '#22232e', w: '#f4f6fa', W: '#ffffff', y: '#ffb43a' },
+    monkey: { m: '#7a4a28', f: '#e0b080', e: '#1b1b1b' },
+    frog: { g: '#5fb83a', G: '#3f8a2a', W: '#ffffff', e: '#1b1b1b' },
+    turtle: { s: '#6b8f3a', S: '#a8c060', k: '#8fae6a', e: '#1b1b1b' },
+    crab: { r: '#e8492e', R: '#b8321f', e: '#1b1b1b' },
+    bee: { y: '#ffd34d', k: '#2a2433', w: '#e8f6ff', e: '#1b1b1b' },
+    fox: { o: '#e8742a', O: '#c25a1c', W: '#fbf3e6', e: '#1b1b1b', n: '#1b1b1b', l: '#3a2418' },
+    hyena: { g: '#c4a46a', G: '#7a5a30', e: '#1b1b1b', n: '#2a1a10', l: '#7a5a30' },
+    crocodile: { c: '#4f8a3a', C: '#3a6a2a', W: '#ffffff', e: '#ffe066', l: '#3a6a2a' },
+    snake: { s: '#7ab03a', S: '#4f7a24', e: '#e8392b' },
+    shark: { g: '#7a8a9a', W: '#e8eef4', e: '#1b1b1b' },
+    skeleton: { b: '#ece6d2', k: '#2a2433' },
+    demon: { h: '#2a1a1a', r: '#d6332a', R: '#a8221c', y: '#ffe066', t: '#a8221c', k: '#2a1a1a' },
+    icegolem: { i: '#dff4ff', I: '#9fd8f5', D: '#5aa0d0', c: '#2a6aa0' },
+    ufo: { d: '#7fe8c8', W: '#ffffff', m: '#c8ccd6', M: '#8a8f9c', y: '#ffe066', r: '#ff5a5a' },
+};
+
+// Cartoon emote icons shown in speech bubbles over creatures.
+const EMOTES = {
+    heart: [['.rr.rr.', 'rWrrrrr', 'rrrrrrr', '.rrrrr.', '..rrr..', '...r...'], { r: '#ff4d6d', W: '#ffffff' }],
+    alert: [['yy', 'yy', 'yy', 'yy', '..', 'yy'], { y: '#ff9f1c' }],
+    skull: [['.www.', 'wkwkw', 'wwwww', '.w.w.'], { w: '#6b6478', k: '#ffffff' }],
+    angry: [['.r..r.', 'rr..rr', '......', 'rr..rr', '.r..r.'], { r: '#ff3b3b' }],
+    note: [['...kk', '...k.', '...k.', '.kkk.', 'kkkk.', '.kk..'], { k: '#3a8fe0' }],
 };
 
 // ---------------------------------------------------------------- tree templates (8x8, baked into terrain)
@@ -132,6 +217,38 @@ const ICONS = {
     cat_nature: [['............', '.......ggg..', '.....ggGGg..', '....gGGGGg..', '...gGGgGGg..', '...gGgGGg...', '..gGgGGg....', '..ggGgg.....', '..g.gg......', '.g..........', 'g...........', '............'], { g: '#2f7a45', G: '#7fd05a' }],
     cat_destroy: [['.....r......', '....rr..r...', '....ror.rr..', '...roorrr...', '..roooorr.r.', '..royyyorrr.', '.royyyyyorr.', '.royywyyor..', '.royywwyor..', '..royyyyor..', '...roooor...', '....rrrr....'], { r: '#d63a1a', o: '#ff8a1f', y: '#ffd34d', w: '#fff8d0' }],
     cat_realm: [['............', '............', '.y...y...y..', '.yy.yyy.yy..', '.yyyyyyyyy..', '.yYyyRyyYy..', '.yyyyyyyyy..', '.YYYYYYYYY..', '............', '............', '............', '............'], { y: '#ffd34d', Y: '#c98a1b', R: '#e6492e' }],
+    cat_animals: [['............', '...pp..pp...', '...pp..pp...', 'pp........pp', 'pp........pp', '....pppp....', '...pPPPPp...', '..pPPPPPPp..', '..pPPPPPPp..', '..pPPPPPPp..', '...pp..pp...', '............'], { p: '#d9a066', P: '#f2c48a' }],
+    cat_monsters: [['............', '...wwwwww...', '..wwwwwwww..', '.wwwwwwwwww.', '.wkkwwwwkkw.', '.wkkkwwkkkw.', '.wkkwwwwkkw.', '.wwwwkkwwww.', '..wwwwwwww..', '...wwwwww...', '...w.ww.w...', '............'], { w: '#efe9dc', k: '#2a2433' }],
+    bomb: [['........y.y.', '.......yoy..', '......k.y...', '.....k......', '...kkkkk....', '..kKKkkkk...', '.kKKkkkkkk..', '.kKkkkkkkk..', '.kkkkkkkkk..', '.kkkkkkkkk..', '..kkkkkkk...', '...kkkkk....'], { k: '#2a2a33', K: '#6b6f80', y: '#ffe066', o: '#ff8a1f' }],
+    napalm: [['.....kk.....', '.....kk.....', '....gggg....', '...gGGGGg...', '...gGyyGg...', '...gGyyGg...', '...gGGGGg...', '...gggggg...', '..r.o.r.o...', '.roroyoror..', '.oyyyyyyyo..', '..oooooooo..'], { g: '#5a6b3a', G: '#7f9a4f', y: '#ffe066', k: '#3a2618', r: '#d63a1a', o: '#ff8a1f' }],
+    acid: [['.....g......', '.....g......', '....ggg.....', '....gGg.....', '...gGGGg....', '...gGWGg....', '..gGGWGGg...', '..gGGGGGg...', '..gGGGGGg...', '...gGGGg....', '....ggg.....', '..d.d..d....'], { g: '#2f8a1f', G: '#8fff3a', W: '#eaffd0', d: '#8fff3a' }],
+    blizzard: [['.....w......', '...w.w.w....', '....www.....', '.w...w...w..', '..w..w..w...', 'wwwwwBwwwww.', '..w..w..w...', '.w...w...w..', '....www.....', '...w.w.w....', '.....w......', '............'], { w: '#dff4ff', B: '#7fd0ff' }],
+    madness: [['............', '..rrrrrrr...', '.rRRRRRRRr..', 'rRkRRRRRkRr.', 'rRRkRRRkRRr.', 'rRkkRRRkkRr.', 'rRRRRRRRRRr.', 'rRRkkkkkRRr.', 'rRkRRRRRkRr.', '.rRRRRRRRr..', '..rrrrrrr...', '............'], { r: '#8a1010', R: '#ff4a3a', k: '#2a0a0a' }],
+    fireworks: [['.y...p...b..', '..y..p..b...', 'y..y.p.b..b.', '.y..yyb..b..', 'pppppWbbbbb.', '..b..yy.y...', '.b..b.p..y..', 'b..b..p...y.', '.....kk.....', '.....kk.....', '.....kk.....', '.....kk.....'], { y: '#ffe066', p: '#ff7eb6', b: '#7dd3fc', W: '#ffffff', k: '#a8763e' }],
+
+    // Small HUD icons (7x7, drawn at 2x)
+    ui_pause: [['.ww.ww.', '.ww.ww.', '.ww.ww.', '.ww.ww.', '.ww.ww.', '.ww.ww.', '.ww.ww.'], { w: '#ffffff' }],
+    ui_play: [['.w.....', '.ww....', '.www...', '.wwww..', '.www...', '.ww....', '.w.....'], { w: '#ffffff' }],
+    ui_sun: [['...y...', '.y.y.y.', '..yyy..', 'yyyYyyy', '..yyy..', '.y.y.y.', '...y...'], { y: '#ffd34d', Y: '#fff3a0' }],
+    ui_moon: [['..wwww.', '.ww....', 'www....', 'www....', 'www....', '.ww....', '..wwww.'], { w: '#e8ecff' }],
+    ui_rain: [['.ggggg.', 'ggGGGgg', 'ggggggg', '.......', '.b.b.b.', 'b.b.b..', '.......'], { g: '#9aa6b8', G: '#dfe6ef', b: '#5aa9e6' }],
+    ui_storm: [['.ggggg.', 'ggGGGgg', 'ggggggg', '...y...', '..yy...', '...y...', '..y....'], { g: '#7a8496', G: '#b8c0cc', y: '#ffe066' }],
+    ui_gear: [['..w.w..', '.wwwww.', 'www.www', '.w...w.', 'www.www', '.wwwww.', '..w.w..'], { w: '#d8cfee' }],
+    ui_help: [['.wwww.', 'ww..ww', '....ww', '..www.', '..ww..', '......', '..ww..'], { w: '#d8cfee' }],
+    ui_save: [['bbbbbb.', 'bwwwwbb', 'bwwwwbb', 'bbbbbbb', 'bbgggbb', 'bbgkgbb', 'bbgggbb'], { b: '#4a7fd4', w: '#ffffff', g: '#cfd6e0', k: '#2a2a33' }],
+    ui_load: [['yyy....', 'yyyyyyy', 'yYYYYYY', 'yYYYYYY', 'yYYYYYY', 'yYYYYYY', 'yyyyyyy'], { y: '#c98a1b', Y: '#ffd34d' }],
+    ui_flag: [['kRRRR..', 'kRRRRRR', 'kRRRRRR', 'kRRRR..', 'k......', 'k......', 'k......'], { k: '#a8763e', R: '#e6492e' }],
+    ui_crown: [['y..y..y', 'yy.y.yy', 'yyyyyyy', 'yRyyyBy', 'yyyyyyy', 'YYYYYYY'], { y: '#ffd34d', Y: '#c98a1b', R: '#e6492e', B: '#5fb4ff' }],
+    ui_scroll: [['tpppppt', '.pkkkp.', '.ppppp.', '.pkkkp.', '.ppppp.', '.pkkpp.', 'tpppppt'], { p: '#f2e6c4', k: '#8a7a66', t: '#a8763e' }],
+    ui_chart: [['......gg', '......gg', '...bb.gg', '...bb.gg', 'rr.bb.gg', 'rr.bb.gg', 'wwwwwwww'], { r: '#e6492e', b: '#5fb4ff', g: '#6fdc7a', w: '#e8e4d4' }],
+    ui_globe: [['..bbb..', '.bgbbg.', 'bggbbgb', 'bbggbbb', 'bbbggbb', '.bbgbb.', '..bbb..'], { b: '#3d8fc7', g: '#7cc152' }],
+    ui_trash: [['..www..', 'wwwwwww', '.ggggg.', '.gkgkg.', '.gkgkg.', '.gkgkg.', '.ggggg.'], { w: '#cfd6e0', g: '#9aa3ab', k: '#5d5a5e' }],
+    ui_dice: [['wwwwwww', 'wkwwwkw', 'wwwwwww', 'wwwkwww', 'wwwwwww', 'wkwwwkw', 'wwwwwww'], { w: '#ffffff', k: '#2a2a33' }],
+    ui_close: [['rr...rr', 'rrr.rrr', '.rrrrr.', '..rrr..', '.rrrrr.', 'rrr.rrr', 'rr...rr'], { r: '#ffffff' }],
+    ui_people: [['..hhh..', '..sss..', '.ccccc.', 'c.ccc.c', '..ccc..', '..c.c..', '..c.c..'], { h: '#5a3825', s: '#f1c27d', c: '#ffcc33' }],
+    ui_paw: [['.p.p.p.', '.p.p.p.', '.......', '..ppp..', '.ppppp.', '.ppppp.', '..p.p..'], { p: '#7cc152' }],
+    ui_castle: [['k.k.k.k', 'kkkkkkk', 'kkkkkkk', 'kk.k.kk', 'kkkkkkk', 'kkkdkkk', 'kkkdkkk'], { k: '#ff6b5a', d: '#3a2618' }],
+    ui_skull: [['.wwwww.', 'wwwwwww', 'wkkwkkw', 'wkkwkkw', 'wwwkwww', '.wwwww.', '.w.w.w.'], { w: '#efe9dc', k: '#2a2433' }],
 };
 
 const Sprites = EP.Sprites = {
@@ -186,6 +303,33 @@ const Sprites = EP.Sprites = {
         return c;
     },
     flame(i) { return this.flames[i % this.flames.length]; },
+    // Width of a species' body in world px (for ground shadows).
+    bodyWidth(species) {
+        const key = 'W|' + species;
+        let w = this.cache.get(key);
+        if (w == null) { w = T[species] ? Math.max(...T[species][0].map(r => r.length)) : 6; this.cache.set(key, w); }
+        return w;
+    },
+    // White speech bubble with an ink outline and a little tail, icon inside.
+    emote(kind) {
+        const key = 'E|' + kind;
+        let c = this.cache.get(key);
+        if (c) return c;
+        const e = EMOTES[kind] || EMOTES.alert;
+        const icon = fromTemplate(e[0], e[1], null);
+        const cw = icon.width + 6, bh = icon.height + 6, cx = cw >> 1;
+        c = mk(cw, bh + 2);
+        const g = c.getContext('2d');
+        const R = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
+        const ink = '#1a1230';
+        R(1, 0, cw - 2, bh, ink); R(0, 1, cw, bh - 2, ink);
+        R(2, 1, cw - 4, bh - 2, '#ffffff'); R(1, 2, cw - 2, bh - 4, '#ffffff');
+        R(2, bh - 3, cw - 4, 1, '#d8d2e6');
+        R(cx - 1, bh, 3, 1, ink); R(cx, bh + 1, 1, 1, ink); R(cx, bh - 1, 1, 1, '#ffffff'); R(cx, bh, 1, 1, '#ffffff');
+        g.drawImage(icon, 3, 3);
+        this.cache.set(key, c);
+        return c;
+    },
 
     // ------------------------------------------------------------ buildings
     building(b, k) {

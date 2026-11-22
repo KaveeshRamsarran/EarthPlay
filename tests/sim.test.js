@@ -80,6 +80,38 @@ function invariants(sim, label) {
     for (let i = 0; i < 3000; i++) sim.update();
     invariants(sim, 'after tools');
 
+    console.log('\n[species] every creature spawns and lives');
+    {
+        const zoo = new EP.Sim({ size: 'small', shape: 'pangaea', seed: 4242, life: 'wild', disasters: 'often' });
+        const wild = EP.WILD.filter(s => !(zoo.speciesCount[s] > 0));
+        check(wild.length <= 3, `wildlife seeded in habitats (${EP.WILD.length - wild.length}/${EP.WILD.length}${wild.length ? ', missing ' + wild.join(' ') : ''})`);
+        const w = zoo.world;
+        let land = null, sea = null;
+        for (let i = 0; i < w.w * w.h && (!land || !sea); i++) {
+            const t = w.terrain[i];
+            if (!land && t === EP.T.GRASS) land = { x: i % w.w + 0.5, y: ((i / w.w) | 0) + 0.5 };
+            if (!sea && t === EP.T.DEEP) sea = { x: i % w.w + 0.5, y: ((i / w.w) | 0) + 0.5 };
+        }
+        let errs = 0, made = 0;
+        for (const s of Object.keys(EP.SPECIES)) {
+            const at = EP.SPECIES[s].kind === 'aquatic' ? sea : land;
+            if (!at) continue;
+            try { if (zoo.powers.spawn(s, at.x, at.y)) made++; } catch (e) { errs++; console.error(`  ✗ spawn ${s}: ${e.stack}`); }
+        }
+        check(made >= Object.keys(EP.SPECIES).length - 2, `spawned ${made}/${Object.keys(EP.SPECIES).length} species by hand`);
+        try {
+            zoo.powers.apply('madness', land.x, land.y, 4);
+            zoo.powers.apply('blizzard', land.x + 3, land.y, 3);
+            for (let i = 0; i < 4000; i++) zoo.update();
+        } catch (e) { errs++; console.error('  ✗ zoo sim: ' + e.stack); }
+        check(errs === 0, 'mixed ecosystem runs without errors');
+        invariants(zoo, 'zoo');
+        const pop = zoo.census();
+        console.log('  census:', JSON.stringify(pop));
+        console.log('  events:'); for (const e of zoo.logEntries.slice(-5)) console.log(`    y${e.year}: ${e.text}`);
+        check(zoo.units.every(u => !(u.madT > 0) || u.traits.includes('mad')), 'madness state consistent');
+    }
+
     console.log('\n[save] round trip');
     const packed = await EP.Save.pack(sim);
     const back = await EP.Save.unpack(packed);

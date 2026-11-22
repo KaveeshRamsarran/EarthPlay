@@ -16,6 +16,17 @@ function iconCanvas(id, size = 32, cls = '') {
     Sprites.paintInto(c, Sprites.icon(id), size);
     return c;
 }
+// Paint every <canvas data-icon="id" data-size="n"> under root with its pixel icon.
+function paintIcons(root) {
+    root.querySelectorAll('canvas[data-icon]').forEach(c => {
+        c.classList.add('px-icon');
+        const size = +c.dataset.size || 16;
+        Sprites.paintInto(c, Sprites.icon(c.dataset.icon), size);
+        c.style.width = c.style.height = size + 'px';
+    });
+}
+EP.paintIcons = paintIcons;
+const CLOSE_BTN = '<button class="icon-btn close" data-act="close" data-close aria-label="Close"><canvas data-icon="ui_close" data-size="18"></canvas></button>';
 function bannerHTML(k, size = 18) {
     return `<img class="banner" width="${size}" height="${Math.round(size * 1.2)}" src="${Sprites.banner(k.color, k.sym).toDataURL()}" alt="">`;
 }
@@ -34,6 +45,7 @@ class UI {
 
     // ------------------------------------------------------------ build
     build() {
+        paintIcons(document);
         const cats = $('#dock-cats'), tools = $('#dock-tools');
         cats.innerHTML = '';
         for (const c of EP.TOOL_CATEGORIES) {
@@ -41,6 +53,7 @@ class UI {
             b.className = 'cat-btn'; b.dataset.cat = c.id;
             b.append(iconCanvas(c.icon, 28));
             const s = document.createElement('span'); s.textContent = c.name; b.append(s);
+            b.setAttribute('aria-label', c.name);
             b.addEventListener('click', () => { this.setCategory(c.id); this.game.audio.play('click'); });
             cats.append(b);
         }
@@ -50,7 +63,7 @@ class UI {
             const b = document.createElement('button');
             b.className = 'tool-btn'; b.dataset.tool = t.id; b.dataset.cat = t.cat;
             b.setAttribute('aria-label', t.name);
-            b.append(iconCanvas(t.icon, 28));
+            b.append(iconCanvas(t.icon, 32));
             const s = document.createElement('span'); s.textContent = t.name; b.append(s);
             b.addEventListener('click', () => { this.game.selectTool(t.id); this.game.audio.play('select'); });
             b.addEventListener('pointerenter', e => this.showTip(b, `<b>${esc(t.name)}</b><p>${esc(t.desc || '')}</p>`));
@@ -154,7 +167,12 @@ class UI {
         $('#hud-realms').textContent = sim.civ.aliveKingdoms().length;
         const day = env.daylight();
         const wt = env.weather.type;
-        $('#hud-sky').innerHTML = (wt === 'storm' ? '⛈' : wt === 'rain' ? '🌧' : day > 0.5 ? '☀' : '☾') + `<span>${wt === 'clear' ? (day > 0.5 ? 'Day' : 'Night') : wt === 'rain' ? 'Rain' : 'Storm'}</span>`;
+        const sky = wt === 'storm' ? 'storm' : wt === 'rain' ? 'rain' : day > 0.5 ? 'sun' : 'moon';
+        if (sky !== this.sky) {
+            this.sky = sky;
+            $('#hud-sky').innerHTML = `<canvas data-icon="ui_${sky}" data-size="18"></canvas><span>${{ sun: 'Day', moon: 'Night', rain: 'Rain', storm: 'Storm' }[sky]}</span>`;
+            paintIcons($('#hud-sky'));
+        }
         this.renderPanel();
     }
 
@@ -202,6 +220,7 @@ class UI {
         body.innerHTML = html;
         body.scrollTop = scroll;
         body.querySelectorAll('canvas[data-sprite]').forEach(c => this.paintSprite(c));
+        paintIcons(body);
         if (p.kind === 'stats') this.drawSparks();
     }
     paintSprite(c) {
@@ -218,7 +237,7 @@ class UI {
         }
     }
     head(title, sub, extra = '') {
-        return `<div class="ph"><div class="ph-text"><h2>${title}</h2>${sub ? `<div class="sub">${sub}</div>` : ''}</div>${extra}<button class="icon-btn close" data-act="close" aria-label="Close">✕</button></div>`;
+        return `<div class="ph"><div class="ph-text"><h2>${title}</h2>${sub ? `<div class="sub">${sub}</div>` : ''}</div>${extra}${CLOSE_BTN}</div>`;
     }
     bar(v, max, color, label) {
         const pct = max > 0 ? EP.clamp(v / max * 100, 0, 100) : 0;
@@ -227,6 +246,10 @@ class UI {
     kLink(k) { return k ? `<a class="klink" data-act="kingdom" data-id="${k.id}" style="--kc:${k.color}">${bannerHTML(k, 14)}${esc(k.name)}</a>` : '<span class="muted">No realm</span>'; }
     doing(u) {
         const sim = this.sim;
+        if (u.frozen > 0) return 'Frozen solid!';
+        if (u.madT > 0) return u.state === 'fight' ? 'Raving mad — attacking everything' : 'Gone mad!';
+        if (u.state === 'abduct') { const t = sim.unitMap.get(u.targetId); return t ? `Abducting ${t.name ? esc(t.name) : 'a ' + SPECIES[t.species].name.toLowerCase()}` : 'Scanning for specimens'; }
+        if (u.state === 'smash') return 'Smashing a building';
         if (u.state === 'fight') { const t = sim.unitMap.get(u.targetId); return t ? `Fighting ${t.name ? esc(t.name) : 'a ' + SPECIES[t.species].name.toLowerCase()}` : 'Fighting'; }
         if (u.state === 'siege') return 'Besieging a building';
         if (u.state === 'flee') return 'Fleeing!';
@@ -246,21 +269,24 @@ class UI {
         const k = civ.kingdoms.get(u.kingdomId), c = civ.cities.get(u.cityId);
         const isKing = k && k.kingId === u.id;
         const title = u.name ? esc(u.name) : sp.name;
-        const sub = `${isKing ? '<span class="crown">♛ Ruler</span> · ' : ''}${sp.name}${u.kind === 'civ' ? (u.adult ? '' : ' child') + (u.job ? ' · ' + JOB_LABEL[u.job] : '') : ''}`;
+        const role = u.kind === 'monster' ? 'Monster' : u.kind === 'aquatic' ? (sp.diet === 'carn' ? 'Sea predator' : 'Sea creature') : sp.diet === 'carn' ? 'Predator' : sp.fly ? 'Pollinator' : 'Grazer';
+        const sub = `${isKing ? '<span class="crown">♛ Ruler</span> · ' : ''}${u.kind === 'civ' ? sp.name + (u.adult ? '' : ' child') + (u.job ? ' · ' + JOB_LABEL[u.job] : '') : role + (u.adult ? '' : ' · young')}`;
         const traits = u.traits.map(t => `<span class="chip ${EP.TRAITS[t].good ? 'good' : 'bad'}">${EP.TRAITS[t].name}</span>`).join('');
         const following = this.game.renderer.follow === u.id;
         return this.head(title, sub) + `
             <div class="portrait-row"><canvas class="portrait" data-sprite="unit:${u.id}:72"></canvas>
               <div class="pr-info"><div class="doing">${this.doing(u)}</div>${u.kind === 'civ' ? `<div>${this.kLink(k)}</div>${c ? `<div class="muted">of <a data-act="city" data-id="${c.id}">${esc(c.name)}</a></div>` : ''}` : ''}</div></div>
             ${this.bar(u.hp, u.hpMax, u.hp / u.hpMax > 0.5 ? '#5fd16a' : '#ff6b4d', `Health ${Math.ceil(u.hp)} / ${u.hpMax}`)}
-            ${u.kind === 'animal' ? this.bar(u.hunger, 100, '#e9c46a', `Fed ${Math.round(u.hunger)}%`) : ''}
+            ${u.kind === 'animal' || (u.kind === 'aquatic' && sp.diet === 'carn') ? this.bar(u.hunger, 100, '#e9c46a', `Fed ${Math.round(u.hunger)}%`) : ''}
             <div class="kv">
-              <div><span>Age</span><b>${Math.floor(u.age)} <small>/ ~${Math.round(u.lifespan)}</small></b></div>
+              <div><span>Age</span><b>${Math.floor(u.age)} <small>of ${Math.round(u.lifespan)}</small></b></div>
               <div><span>Attack</span><b>${u.atk.toFixed(1)}</b></div>
               <div><span>Level</span><b>${u.level}</b></div>
               <div><span>Kills</span><b>${u.kills}</b></div>
             </div>
-            ${u.sick ? '<div class="warn">Sick with plague</div>' : ''}
+            ${u.sick ? `<div class="warn">${u.kind === 'civ' ? 'Sick with plague' : 'Sick'}</div>` : ''}
+            ${u.frozen > 0 ? '<div class="warn ice">Frozen in ice</div>' : ''}
+            ${u.kind !== 'civ' ? `<p class="muted small">${esc(sp.desc || '')}</p>` : ''}
             ${traits ? `<div class="chips">${traits}</div>` : ''}
             <div class="actions">
               <button class="btn ${following ? 'on' : ''}" data-act="follow" data-id="${u.id}">${following ? 'Following' : 'Follow'}</button>
@@ -323,7 +349,7 @@ class UI {
         const fallen = [...civ.kingdoms.values()].filter(k => !k.alive).slice(-8).reverse();
         const row = k => `<a class="realm-row" data-act="kingdom" data-id="${k.id}" style="--kc:${k.color}">${bannerHTML(k, 18)}<span class="rn"><b>${esc(k.name)}</b><small>${SPECIES[k.race].plural} · ${AGES[k.age].name}${Object.keys(k.wars).length ? ' · <em class="bad">at war</em>' : ''}</small></span><span class="rp">${k.alive ? k.pop : '—'}<small>${k.alive ? k.cities.length + (k.cities.length === 1 ? ' town' : ' towns') : 'fell y' + k.fell}</small></span></a>`;
         return this.head('Realms', `${alive.length} standing`) +
-            (alive.length ? alive.map(row).join('') : '<p class="muted pad">No realms yet. Place Humans, Elves, Dwarves or Orcs from the <b>Life</b> tab and they will found one.</p>') +
+            (alive.length ? alive.map(row).join('') : '<p class="muted pad">No realms yet. Place Humans, Elves, Dwarves or Orcs from the <b>Peoples</b> tab and they will found one.</p>') +
             (fallen.length ? `<h3>Fallen</h3>${fallen.map(row).join('')}` : '');
     }
     chronicleHTML() {
@@ -333,8 +359,8 @@ class UI {
     }
     statsHTML() {
         const sim = this.sim, pop = sim.census();
-        const groups = [['Peoples', EP.CIV_RACES], ['Wildlife', ['deer', 'sheep', 'rabbit', 'wolf', 'bear', 'fish']], ['Monsters', ['zombie', 'dragon']]];
-        const tbl = groups.map(([g, list]) => `<h3>${g}</h3><div class="species">${list.map(s => `<div><canvas data-sprite="icon:${s}:28"></canvas><span>${SPECIES[s].plural}</span><b>${pop[s] || 0}</b></div>`).join('')}</div>`).join('');
+        const groups = [['Peoples', EP.CIV_RACES], ['Animals', EP.ANIMALS], ['Monsters', EP.MONSTERS]];
+        const tbl = groups.map(([g, list]) => `<h3>${g}</h3><div class="species">${list.map(s => `<div class="${pop[s] ? '' : 'none'}"><canvas data-sprite="icon:${s}:28"></canvas><span>${SPECIES[s].plural}</span><b>${pop[s] || 0}</b></div>`).join('')}</div>`).join('');
         const h = sim.history;
         const spark = EP.CIV_RACES.map(r => `<div class="spark" data-series="${r}"><div class="spark-h"><span>${SPECIES[r].plural}</span><b>${pop[r] || 0}</b></div><canvas height="44"></canvas></div>`).join('');
         return this.head('World statistics', `Year ${sim.year} · ${sim.world.w}×${sim.world.h} · seed ${sim.seed}`) + `
@@ -399,6 +425,7 @@ class UI {
         const root = $('#modal-root');
         root.innerHTML = `<div class="modal-back"></div><div class="modal ${cls}" role="dialog" aria-modal="true">${html}</div>`;
         root.hidden = false;
+        paintIcons(root);
         root.querySelector('.modal-back').addEventListener('click', () => this.closeModal());
         root.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => this.closeModal()));
         this.game.modalOpen = true;
@@ -409,12 +436,12 @@ class UI {
     async openSaveLoad(mode) {
         const slots = EP.Save.SLOTS.map(s => ({ s, m: EP.Save.meta(s) }));
         const m = this.modal(`
-            <div class="mh"><h2>${mode === 'save' ? 'Save world' : 'Load world'}</h2><button class="icon-btn" data-close aria-label="Close">✕</button></div>
+            <div class="mh"><h2>${mode === 'save' ? 'Save world' : 'Load world'}</h2>${CLOSE_BTN}</div>
             <div class="slots">${slots.map(({ s, m }) => `
                 <div class="slot ${m ? '' : 'empty'}" data-slot="${s}">
                   <div class="thumb">${m && m.thumb ? `<img src="${m.thumb}" alt="">` : ''}</div>
                   <div class="slot-info"><b>${s === 'auto' ? 'Autosave' : 'Slot ' + s}</b>${m ? `<small>Year ${m.year} · ${m.pop} people · ${m.kingdoms} realms<br>${m.size} · ${new Date(m.date).toLocaleString()}</small>` : '<small>Empty</small>'}</div>
-                  <div class="slot-act">${mode === 'save' && s !== 'auto' ? `<button class="btn primary" data-do="save">Save</button>` : ''}${mode === 'load' && m ? `<button class="btn primary" data-do="load">Load</button>` : ''}${m && s !== 'auto' ? `<button class="icon-btn" data-do="del" aria-label="Delete">🗑</button>` : ''}</div>
+                  <div class="slot-act">${mode === 'save' && s !== 'auto' ? `<button class="btn primary" data-do="save">Save</button>` : ''}${mode === 'load' && m ? `<button class="btn primary" data-do="load">Load</button>` : ''}${m && s !== 'auto' ? `<button class="icon-btn" data-do="del" aria-label="Delete"><canvas data-icon="ui_trash" data-size="18"></canvas></button>` : ''}</div>
                 </div>`).join('')}</div>
             <div class="mf"><button class="btn" data-do="export">Export to file</button><label class="btn">Import file<input type="file" accept=".world,.txt" hidden data-do="import"></label></div>`, 'wide');
         m.addEventListener('click', async e => {
@@ -438,7 +465,7 @@ class UI {
     openSettings() {
         const r = this.game.renderer.settings, a = this.game.audio;
         const m = this.modal(`
-            <div class="mh"><h2>Settings</h2><button class="icon-btn" data-close aria-label="Close">✕</button></div>
+            <div class="mh"><h2>Settings</h2>${CLOSE_BTN}</div>
             <div class="settings">
               <label class="toggle"><input type="checkbox" data-set="sound" ${a.enabled ? 'checked' : ''}><span>Sound</span></label>
               <label class="range">Volume<input type="range" min="0" max="1" step="0.05" value="${a.volume}" data-set="volume"></label>
@@ -458,7 +485,7 @@ class UI {
     }
     openHelp() {
         this.modal(`
-            <div class="mh"><h2>How to play</h2><button class="icon-btn" data-close aria-label="Close">✕</button></div>
+            <div class="mh"><h2>How to play</h2>${CLOSE_BTN}</div>
             <div class="help">
               <p>You are the god of a living world. Shape the land, seed life, and watch realms rise, trade blows and fall — or rain ruin upon them.</p>
               <div class="help-grid">
@@ -482,13 +509,16 @@ class UI {
                 <li>Crowded towns send settlers to found new towns. Big empires suffer rebellions.</li>
                 <li>Neighbouring realms grow to hate each other. Use <b>Discord</b> to start wars, <b>Harmony</b> to end them.</li>
                 <li>Click any creature, building or territory with <b>Inspect</b> to learn its story.</li>
+                <li>Over 20 kinds of animal live in their own biomes: camels in deserts, penguins on tundra, crocodiles in swamps, sharks in the deep. Bees plant shrubs and heal burnt land.</li>
+                <li>Monsters bring chaos: demons crawl out of volcanoes and set fires, ice golems freeze the land, UFOs abduct people. Turn on <b>Disasters</b> when creating a world for surprise events.</li>
+                <li><b>Madness</b> turns creatures on everyone; <b>Cure</b> calms them and thaws the frozen. <b>Fireworks</b> cheer realms up.</li>
               </ul>
             </div>`, 'wide');
     }
     openNewWorld() {
         const o = this.game.lastOpts || {};
         const m = this.modal(`
-            <div class="mh"><h2>Create a new world</h2><button class="icon-btn" data-close aria-label="Close">✕</button></div>
+            <div class="mh"><h2>Create a new world</h2>${CLOSE_BTN}</div>
             ${EP.worldFormHTML(o)}
             <div class="mf"><button class="btn" data-close>Cancel</button><button class="btn primary" data-do="create">Create world</button></div>`, 'wide');
         EP.bindWorldForm(m);
@@ -505,10 +535,12 @@ EP.worldFormHTML = function (o = {}) {
         <label>Land shape</label>${seg('shape', Object.entries(EP.WORLD_SHAPES).map(([k, v]) => [k, v.label]), o.shape || 'continent')}
         <label>Sea level</label>${seg('sea', [['low', 'Low'], ['normal', 'Normal'], ['high', 'High']], o.sea || 'normal')}
         <label>Starting life</label>${seg('life', [['civ', 'Civilisations'], ['wild', 'Wildlife only'], ['empty', 'Barren']], o.life || 'civ')}
-        <label for="wf-seed">Seed</label><div class="seed-row"><input id="wf-seed" type="text" placeholder="Random" value="${o.seedText || ''}" maxlength="24"><button type="button" class="btn" data-dice aria-label="Random seed">🎲</button></div>
+        <label>Disasters</label>${seg('disasters', Object.entries(EP.DISASTER_LEVELS).map(([k, v]) => [k, v.label]), o.disasters || 'rare')}
+        <label for="wf-seed">Seed</label><div class="seed-row"><input id="wf-seed" type="text" placeholder="Random" value="${esc(o.seedText || '')}" maxlength="24"><button type="button" class="btn" data-dice aria-label="Random seed" title="Random seed"><canvas data-icon="ui_dice" data-size="18"></canvas></button></div>
     </div>`;
 };
 EP.bindWorldForm = function (root) {
+    paintIcons(root);
     root.querySelectorAll('.seg').forEach(s => s.addEventListener('click', e => {
         const b = e.target.closest('button'); if (!b) return;
         s.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
@@ -520,6 +552,6 @@ EP.readWorldForm = function (root) {
     const v = n => root.querySelector(`.seg[data-name=${n}] .on`)?.dataset.v;
     const seedText = root.querySelector('#wf-seed').value.trim();
     const seed = seedText ? (/^\d+$/.test(seedText) ? +seedText >>> 0 : EP.hashString(seedText)) : ((Math.random() * 1e9) >>> 0);
-    return { size: v('size'), shape: v('shape'), sea: v('sea'), life: v('life'), seed, seedText };
+    return { size: v('size'), shape: v('shape'), sea: v('sea'), life: v('life'), disasters: v('disasters'), seed, seedText };
 };
 })();

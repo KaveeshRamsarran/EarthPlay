@@ -1,5 +1,21 @@
 # Changelog
 
+## 3.1 — Menagerie & pixel UI
+
+**More life**
+- 15 new animals: chicken, cow, buffalo, camel, penguin, monkey, frog, turtle, crab, bee, fox, hyena, crocodile, snake and shark. Every wild species has a home biome where it is seeded, returns to and migrates back into.
+- 4 new monsters: skeleton, demon, ice golem and UFO.
+- New behaviours: amphibious creatures wade through shallows; buffalo stampede at threats; snake bites cause sickness; bees plant shrubs and green scorched ground; sharks hunt swimmers; crocodiles ambush waders; demons leave fire and climb out of volcanoes; ice golems freeze creatures and turn land to tundra; UFOs zap buildings and abduct people; skeletons, demons and golems smash buildings.
+
+**New powers**: Bomb, Napalm, Acid, Blizzard, Madness and Fireworks. Cure now also calms madness and thaws frozen creatures; Undeath raises skeletons as well as zombies.
+
+**Natural disasters**: a new world option (Off / Rare / Often) for random meteors, tornadoes, earthquakes, volcanoes, blizzards, UFO visits and dragons.
+
+**Look & feel**
+- The HUD is rebuilt in a chunky pixel/cartoon style with notched pixel frames, bevelled push buttons, Pixelify Sans throughout, pixel-art icons in place of emoji, a parchment tooltip, colour-coded dock tabs and a hopping critter parade on the title screen.
+- Cartoon emote bubbles over creatures, ice blocks around frozen creatures, UFO tractor beams, laser bolts, falling bombs, fireworks and creature-sized shadows.
+- The dock is split into Peoples, Animals and Monsters tabs; Stats lists every species.
+
 ## 3.0 — Full overhaul
 
 A ground-up rewrite of the engine, visuals and gameplay.

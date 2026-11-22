@@ -366,8 +366,9 @@ class Renderer {
             ctx.fillStyle = 'rgba(0,0,0,0.28)';
             for (const e of list) if (e.u && e.u.kind !== 'aquatic') {
                 const fly = e.u.sp.fly;
-                const sw = fly ? 12 : e.u.kind === 'animal' ? 6 : 5;
-                ctx.fillRect(e.x - sw / 2, e.py - 1 + (fly ? 4 : 0), sw, fly ? 3 : 2);
+                const sw = Math.max(3, Math.round(Sprites.bodyWidth(e.u.species) * (fly ? 0.8 : 0.7)));
+                ctx.fillRect(Math.round(e.x - sw / 2), Math.round(e.py - 1 + (fly ? 4 : 0)), sw, fly ? 3 : 2);
+                if (!fly && sw > 4) ctx.fillRect(Math.round(e.x - sw / 2) + 1, Math.round(e.py), sw - 2, 1);
             }
         }
         const frameT = this.time * 7;
@@ -377,7 +378,7 @@ class Renderer {
             const k = u.kingdomId >= 0 ? civ.kingdoms.get(u.kingdomId) : null;
             if (dots) {
                 ctx.fillStyle = k ? k.color : u.kind === 'monster' ? '#ff3355' : u.kind === 'aquatic' ? '#9fd3ff' : u.kind === 'civ' ? '#dddddd' : '#c9a36b';
-                const s = u.species === 'dragon' ? 10 : 2.4 / z;
+                const s = u.species === 'dragon' || u.species === 'ufo' ? 10 : 2.4 / z;
                 ctx.fillRect(e.x - s / 2, e.py - s, s, s);
                 continue;
             }
@@ -389,12 +390,20 @@ class Renderer {
             else if (u.kind === 'animal' && !u.adult) s = 0.7;
             if (u.traits.includes('giant')) s = 1.35;
             const sw = spr.width * s, sh = spr.height * s;
-            const lift = u.sp.fly ? 10 + Math.sin(this.time * 3 + u.id) * 2 : (u.kind === 'aquatic' ? -2 : 0);
+            const frozen = u.frozen > 0;
+            const lift = u.sp.fly ? (u.sp.lift || 10) + (frozen ? 0 : Math.sin(this.time * 3 + u.id) * 2) : (u.kind === 'aquatic' ? -2 : 0);
             const dx = Math.round(e.x - sw / 2), dy = Math.round(e.py - sh + 1 - lift);
-            if (u.kind === 'aquatic') ctx.globalAlpha = 0.75;
+            if (u.species === 'ufo' && u.state === 'abduct' && u.workT > 0) this.drawBeam(ctx, u, e.x, dy + sh, lights);
+            if (u.kind === 'aquatic' || (u.sp.amphibious && sim.world.isWater(u.x, u.y))) ctx.globalAlpha = 0.75;
             ctx.drawImage(spr, dx, dy, sw, sh);
             if (u.hitT > 0) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.7; ctx.drawImage(spr, dx, dy, sw, sh); ctx.globalCompositeOperation = 'source-over'; }
             ctx.globalAlpha = 1;
+            if (frozen) { // encased in an ice cube
+                ctx.fillStyle = 'rgba(170,225,255,0.5)'; ctx.fillRect(dx - 1, dy - 1, sw + 2, sh + 2);
+                ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillRect(dx - 1, dy - 1, sw + 2, 1); ctx.fillRect(dx - 1, dy, 1, Math.max(1, sh - 2));
+                ctx.fillStyle = 'rgba(60,140,200,0.7)'; ctx.fillRect(dx - 1, dy + sh + 1, sw + 2, 1); ctx.fillRect(dx + sw + 1, dy, 1, sh + 1);
+            }
+            if (u.madT > 0 && ((this.time * 4 + u.id) & 1)) { ctx.fillStyle = '#ff3b3b'; ctx.fillRect(Math.round(e.x) - 2, dy - 4, 1, 1); ctx.fillRect(Math.round(e.x) + 1, dy - 4, 1, 1); ctx.fillRect(Math.round(e.x) - 1, dy - 3, 2, 1); }
             if (u.kind === 'civ' && u.adult) {
                 if (u.job === 'warrior') {
                     const wc = EP.AGES[k ? k.age : 0].weapon;
@@ -412,8 +421,27 @@ class Renderer {
                 ctx.fillStyle = u.hp / u.hpMax > 0.5 ? '#6fdc5a' : u.hp / u.hpMax > 0.25 ? '#ffc14d' : '#ff4d4d';
                 ctx.fillRect(Math.round(e.x - bw / 2), dy - 5, Math.max(1, Math.round(bw * u.hp / u.hpMax)), 1);
             }
-            if (u.species === 'dragon' && lights.length < 600) lights.push([e.x, dy + 6, 14, 'fire']);
+            if (lights.length < 600) {
+                if (u.species === 'dragon' || u.species === 'demon') lights.push([e.x, dy + 6, 14, 'fire']);
+                else if (u.species === 'ufo') lights.push([e.x, dy + 4, 20, 'magic']);
+                else if (u.species === 'icegolem') lights.push([e.x, dy + 4, 12, 'magic']);
+            }
         }
+    }
+    drawBeam(ctx, u, x, y0, lights) {
+        const t = this.sim.unitMap.get(u.targetId);
+        if (!t) return;
+        const tx = t.x * TS, ty = t.y * TS;
+        const pulse = 0.22 + Math.sin(this.time * 14) * 0.06;
+        ctx.fillStyle = `rgba(160,255,190,${pulse})`;
+        ctx.beginPath(); ctx.moveTo(x - 3, y0); ctx.lineTo(x + 3, y0); ctx.lineTo(tx + 7, ty + 1); ctx.lineTo(tx - 7, ty + 1); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = 'rgba(230,255,240,0.5)';
+        for (let k = 0; k < 4; k++) {
+            const f = ((this.time * 1.5 + k / 4) % 1);
+            const yy = ty + (y0 - ty) * f, hw = 3 + 4 * (1 - f);
+            ctx.fillRect(Math.round(x + (tx - x) * (1 - f) - hw), Math.round(yy), Math.round(hw * 2), 1);
+        }
+        lights.push([tx, ty - 4, 16, 'magic']);
     }
     drawBuilding(ctx, b, lights) {
         const sim = this.sim, k = sim.civ.buildingKingdom(b);
@@ -456,9 +484,16 @@ class Renderer {
         // Projectiles
         for (const p of sim.projectiles) {
             const f = p.t / p.dur;
-            const arc = Math.sin(Math.PI * f) * Math.min(2.5, Math.hypot(p.tx - p.sx, p.ty - p.sy) * 0.18);
+            const arc = p.kind === 'laser' ? 0 : Math.sin(Math.PI * f) * Math.min(2.5, Math.hypot(p.tx - p.sx, p.ty - p.sy) * 0.18);
             const x = p.x * TS, y = (p.y - arc) * TS;
-            if (p.kind === 'arrow') {
+            if (p.kind === 'laser') {
+                const bx = EP.lerp(p.sx, p.tx, Math.max(0, f - 0.35)) * TS, by = EP.lerp(p.sy, p.ty, Math.max(0, f - 0.35)) * TS;
+                ctx.lineCap = 'square';
+                ctx.strokeStyle = 'rgba(120,255,170,0.45)'; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(x, y); ctx.stroke();
+                ctx.strokeStyle = '#eafff0'; ctx.lineWidth = 0.9; ctx.stroke();
+                ctx.lineCap = 'butt';
+                lights.push([x, y, 10, 'magic']);
+            } else if (p.kind === 'arrow') {
                 const a = Math.atan2((p.ty - p.sy) * TS - Math.cos(Math.PI * f) * arc * TS * 2, (p.tx - p.sx) * TS);
                 ctx.strokeStyle = '#5c3c22'; ctx.lineWidth = 0.8;
                 ctx.beginPath(); ctx.moveTo(x - Math.cos(a) * 3, y - Math.sin(a) * 3); ctx.lineTo(x, y); ctx.stroke();
@@ -473,7 +508,7 @@ class Renderer {
         for (const f of pw.falling) {
             const p = f.t / f.dur;
             const x = EP.lerp(f.sx, f.x, p) * TS, y = EP.lerp(f.sy, f.y, p) * TS;
-            if (f.kind !== 'lavabomb') {
+            if (f.kind !== 'lavabomb' && f.kind !== 'napalm') {
                 ctx.strokeStyle = `rgba(255,80,60,${0.4 + 0.4 * Math.sin(this.time * 12)})`; ctx.lineWidth = 1;
                 ctx.beginPath(); ctx.arc(f.x * TS, f.y * TS, 4 + (1 - p) * 10, 0, Math.PI * 2); ctx.stroke();
                 ctx.fillStyle = `rgba(0,0,0,${0.15 + p * 0.25})`; ctx.beginPath(); ctx.ellipse(f.x * TS, f.y * TS, 2 + p * 6, 1 + p * 3, 0, 0, Math.PI * 2); ctx.fill();
@@ -485,6 +520,14 @@ class Renderer {
             } else if (f.kind === 'nuke') {
                 ctx.fillStyle = '#3a3f4a'; ctx.fillRect(x - 1.5, y - 4, 3, 6); ctx.fillStyle = '#ffd34d'; ctx.fillRect(x - 1.5, y - 1, 3, 1);
                 ctx.fillStyle = '#2a2d35'; ctx.fillRect(x - 2.5, y - 5, 5, 1);
+            } else if (f.kind === 'bomb') {
+                ctx.fillStyle = '#1a1230'; ctx.fillRect(x - 2.5, y - 2, 5, 5); ctx.fillRect(x - 1.5, y - 3, 3, 7);
+                ctx.fillStyle = '#6b6f80'; ctx.fillRect(x - 1.5, y - 1, 1, 1);
+                ctx.fillStyle = (this.time * 10 | 0) & 1 ? '#ffe066' : '#ff8a1f'; ctx.fillRect(x + 1, y - 4.5, 1.5, 1.5);
+            } else if (f.kind === 'napalm') {
+                ctx.fillStyle = '#5a6b3a'; ctx.fillRect(x - 1, y - 2, 2, 4);
+                ctx.fillStyle = '#ff8a1f'; ctx.fillRect(x - 1, y + 2, 2, 1.5);
+                lights.push([x, y, 8, 'fire']);
             } else { ctx.fillStyle = '#ffb43a'; ctx.fillRect(x - 1, y - 1, 2, 2); lights.push([x, y, 10, 'lava']); }
         }
         // Tornados
@@ -506,6 +549,18 @@ class Renderer {
             ctx.fillStyle = p.color;
             ctx.fillRect(x - p.size / 2, y - p.size / 2, p.size, p.size);
             if (p.glow && lights.length < 700) lights.push([x, y, 5 + p.size * 2, 'warm']);
+        }
+        ctx.globalAlpha = 1;
+        // Emote bubbles
+        for (const em of fx.emotes) {
+            const spr = Sprites.emote(em.kind);
+            const x = em.x * TS, y = em.y * TS;
+            if (x < vx0 || x > vx1 || y < vy0 || y > vy1) continue;
+            const age = em.max - em.life;
+            const pop = age < 4 ? 0.6 + age * 0.1 : 1;
+            ctx.globalAlpha = Math.min(1, em.life / 15);
+            const w = spr.width * pop, h = spr.height * pop;
+            ctx.drawImage(spr, Math.round(x - w / 2), Math.round(y - 12 - h), w, h);
         }
         ctx.globalAlpha = 1;
         // Bolts
@@ -654,8 +709,9 @@ class Renderer {
         for (const t of fx.texts) {
             const p = this.tileToScreen(t.x, t.y);
             ctx.globalAlpha = Math.min(1, t.life / 20);
-            ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillText(t.str, p.x + 1, p.y + 1);
-            ctx.fillStyle = t.color; ctx.fillText(t.str, p.x, p.y);
+            ctx.fillStyle = '#1a1230';
+            for (const [ox, oy] of [[-2, 0], [2, 0], [0, -2], [0, 2], [-1, -1], [1, 1], [-1, 1], [1, -1], [0, 3]]) ctx.fillText(t.str, Math.round(p.x) + ox, Math.round(p.y) + oy);
+            ctx.fillStyle = t.color; ctx.fillText(t.str, Math.round(p.x), Math.round(p.y));
         }
         ctx.globalAlpha = 1;
         // Label selected unit
@@ -666,10 +722,13 @@ class Renderer {
                 const p = this.tileToScreen(u.x, u.y);
                 const label = u.name || EP.SPECIES[u.species].name;
                 ctx.font = '600 12px "Pixelify Sans", monospace';
-                const tw = ctx.measureText(label).width;
-                const y = p.y - 12 * this.cam.zoom - 14;
-                ctx.fillStyle = 'rgba(14,16,26,0.8)'; ctx.fillRect(p.x - tw / 2 - 5, y - 11, tw + 10, 16);
-                ctx.fillStyle = '#ffe9a8'; ctx.fillText(label, p.x, y + 1);
+                const tw = Math.ceil(ctx.measureText(label).width);
+                const y = Math.round(p.y - 12 * this.cam.zoom - 14), lx = Math.round(p.x - tw / 2 - 6), lw = tw + 12;
+                ctx.fillStyle = '#1a1230'; ctx.fillRect(lx - 2, y - 12, lw + 4, 18); ctx.fillRect(lx, y - 14, lw, 22);
+                ctx.fillRect(Math.round(p.x) - 3, y + 8, 6, 2); ctx.fillRect(Math.round(p.x) - 1, y + 10, 2, 2);
+                ctx.fillStyle = '#3a2f68'; ctx.fillRect(lx, y - 12, lw, 18);
+                ctx.fillStyle = '#4a3d82'; ctx.fillRect(lx, y - 12, lw, 2);
+                ctx.fillStyle = '#ffe27a'; ctx.fillText(label, Math.round(p.x), y + 1);
             }
         }
     }

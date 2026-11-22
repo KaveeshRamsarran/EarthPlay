@@ -275,6 +275,14 @@ class Environment {
         const w = this.sim.world;
         if (w.fire[i]) { w.fire[i] = 0; this.fires.delete(i); }
     }
+    // Frost: ground turns to tundra, trees to firs, flames and lava die out.
+    freeze(i) {
+        const w = this.sim.world, t = w.terrain[i];
+        this.extinguish(i);
+        if (t === T.LAVA) w.setTerrain(i, T.ROCK);
+        else if (t === T.GRASS || t === T.SAVANNA || t === T.SAND || t === T.SOIL || t === T.SWAMP || t === T.ASH || t === T.DESERT) w.setTerrain(i, T.SNOW);
+        if (w.tree[i] && w.tree[i] !== TREE.SNOWPINE && w.terrain[i] === T.SNOW) w.setTree(i, TREE.SNOWPINE);
+    }
     isRaining() { return this.weather.type !== 'clear' && this.weather.intensity > 0.3; }
 
     daylight() {

@@ -7,7 +7,7 @@
     <meta name="description" content="A god simulator: shape a living pixel world, seed civilisations and watch them rise and fall.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Pixelify+Sans:wght@500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -18,6 +18,7 @@
         <div class="title-card">
             <h1 class="logo"><span class="l1">EARTH</span><span class="l2">PLAY</span></h1>
             <p class="tagline">Shape a living world. Watch civilisations rise — and fall.</p>
+            <div class="title-critters" aria-hidden="true"></div>
             <button id="btn-continue" class="btn big ghost" hidden>Continue<small></small></button>
             <div id="title-form"></div>
             <div class="title-actions">
@@ -32,30 +33,30 @@
         <header class="topbar">
             <div class="tb-group stats">
                 <span class="mini-logo">EP</span>
-                <span class="stat" title="Current year"><b id="hud-year">Year 0</b></span>
-                <span class="stat sky" id="hud-sky" title="Time of day & weather">☀</span>
-                <span class="stat" title="People in realms"><i class="dot people"></i><b id="hud-pop">0</b><small>people</small></span>
-                <span class="stat" title="All living creatures"><i class="dot life"></i><b id="hud-life">0</b><small>creatures</small></span>
-                <span class="stat" title="Standing realms"><i class="dot realms"></i><b id="hud-realms">0</b><small>realms</small></span>
+                <span class="stat year" title="Current year"><b id="hud-year">Year 0</b></span>
+                <span class="stat sky" id="hud-sky" title="Time of day & weather"><canvas data-icon="ui_sun" data-size="18"></canvas><span>Day</span></span>
+                <span class="stat" title="People in realms"><canvas data-icon="ui_people" data-size="18"></canvas><b id="hud-pop">0</b><small>people</small></span>
+                <span class="stat" title="All living creatures"><canvas data-icon="ui_paw" data-size="18"></canvas><b id="hud-life">0</b><small>creatures</small></span>
+                <span class="stat" title="Standing realms"><canvas data-icon="ui_castle" data-size="18"></canvas><b id="hud-realms">0</b><small>realms</small></span>
             </div>
             <div class="tb-group speed" role="group" aria-label="Simulation speed">
-                <button data-speed="0" title="Pause (Space)" aria-label="Pause"><svg viewBox="0 0 16 16"><rect x="3" y="2" width="3.5" height="12" rx="1"/><rect x="9.5" y="2" width="3.5" height="12" rx="1"/></svg></button>
+                <button data-speed="0" title="Pause (Space)" aria-label="Pause"><canvas data-icon="ui_pause" data-size="18"></canvas></button>
                 <button data-speed="1" title="Normal speed (1)">1×</button>
                 <button data-speed="2" title="Fast (2)">2×</button>
                 <button data-speed="5" title="Faster (3)">5×</button>
                 <button data-speed="10" title="Fastest (4)">10×</button>
             </div>
             <div class="tb-group actions">
-                <button id="btn-borders" class="tb-btn" title="Realm borders (B)">Borders</button>
-                <button id="btn-realms" class="tb-btn" data-panel-btn="realms" title="Realms (K)">Realms</button>
-                <button id="btn-chronicle" class="tb-btn" data-panel-btn="chronicle" title="Chronicle (C)">Chronicle</button>
-                <button id="btn-stats" class="tb-btn" data-panel-btn="stats" title="Statistics (G)">Stats</button>
+                <button id="btn-borders" class="tb-btn" title="Realm borders (B)"><canvas data-icon="ui_flag" data-size="18"></canvas><span>Borders</span></button>
+                <button id="btn-realms" class="tb-btn" data-panel-btn="realms" title="Realms (K)"><canvas data-icon="ui_crown" data-size="18"></canvas><span>Realms</span></button>
+                <button id="btn-chronicle" class="tb-btn" data-panel-btn="chronicle" title="Chronicle (C)"><canvas data-icon="ui_scroll" data-size="18"></canvas><span>Chronicle</span></button>
+                <button id="btn-stats" class="tb-btn" data-panel-btn="stats" title="Statistics (G)"><canvas data-icon="ui_chart" data-size="18"></canvas><span>Stats</span></button>
                 <span class="sep"></span>
-                <button id="btn-save" class="tb-btn" title="Save (Ctrl+S quick-saves)">Save</button>
-                <button id="btn-load" class="tb-btn" title="Load (Ctrl+O)">Load</button>
-                <button id="btn-settings" class="icon-btn" title="Settings" aria-label="Settings"><svg viewBox="0 0 16 16"><path d="M8 5.2a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6Zm6.1 3.6-1.4.5a4.9 4.9 0 0 1-.5 1.2l.6 1.3-1.1 1.1-1.3-.6c-.4.2-.8.4-1.2.5L8.8 14H7.2l-.5-1.4a4.9 4.9 0 0 1-1.2-.5l-1.3.6-1.1-1.1.6-1.3a4.9 4.9 0 0 1-.5-1.2L1.9 8.8V7.2l1.4-.5c.1-.4.3-.8.5-1.2l-.6-1.3 1.1-1.1 1.3.6c.4-.2.8-.4 1.2-.5L7.2 2h1.6l.5 1.4c.4.1.8.3 1.2.5l1.3-.6 1.1 1.1-.6 1.3c.2.4.4.8.5 1.2l1.4.5v1.4Z"/></svg></button>
-                <button id="btn-help" class="icon-btn" title="How to play (H)" aria-label="Help">?</button>
-                <button id="btn-menu" class="tb-btn accent" title="Create a new world">New world</button>
+                <button id="btn-save" class="tb-btn" title="Save (Ctrl+S quick-saves)"><canvas data-icon="ui_save" data-size="18"></canvas><span>Save</span></button>
+                <button id="btn-load" class="tb-btn" title="Load (Ctrl+O)"><canvas data-icon="ui_load" data-size="18"></canvas><span>Load</span></button>
+                <button id="btn-settings" class="icon-btn" title="Settings" aria-label="Settings"><canvas data-icon="ui_gear" data-size="18"></canvas></button>
+                <button id="btn-help" class="icon-btn" title="How to play (H)" aria-label="Help"><canvas data-icon="ui_help" data-size="18"></canvas></button>
+                <button id="btn-menu" class="tb-btn accent" title="Create a new world"><canvas data-icon="ui_globe" data-size="18"></canvas><span>New world</span></button>
             </div>
         </header>
 
@@ -64,7 +65,7 @@
         <aside id="panel" hidden><div id="panel-body"></div></aside>
 
         <div id="minimap-wrap">
-            <button id="btn-minimap" class="mm-toggle" title="Toggle minimap (M)" aria-label="Toggle minimap">▾</button>
+            <button id="btn-minimap" class="mm-toggle" title="Toggle minimap (M)" aria-label="Toggle minimap">Map</button>
             <canvas id="minimap"></canvas>
         </div>
 
@@ -84,7 +85,7 @@
     <div id="tooltip" hidden></div>
     <div id="toasts"></div>
     <div id="modal-root" hidden></div>
-    <div id="loading" hidden><div class="spinner"></div><p id="loading-text">Shaping the world…</p></div>
+    <div id="loading" hidden><div class="spinner"><i></i><i></i><i></i><i></i></div><p id="loading-text">Shaping the world…</p></div>
 
     <script src="js/core.js"></script>
     <script src="js/data.js"></script>

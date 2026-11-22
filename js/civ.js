@@ -49,7 +49,7 @@ class CivSystem {
     }
     hostileToKingdom(k, o) {
         if (o.dead) return false;
-        if (o.kind === 'monster') return true;
+        if (o.kind === 'monster' || o.madT > 0) return true;
         if (o.kind === 'civ') return o.kingdomId >= 0 && k.wars[o.kingdomId] != null;
         if (o.kind === 'animal' && SPECIES[o.species].diet === 'carn') {
             const c = this.cityAt(o.x, o.y);
@@ -957,7 +957,7 @@ const CivAI = EP.CivAI = {
                     CivAI.goto(u, x + 0.5, y + 0.5, { kind: 'farm', bid: f.id, i: -1 });
                     return;
                 }
-                const prey = sim.grid.nearest(c.x, c.y, 12, o => o.kind === 'animal' && SPECIES[o.species].diet === 'herb');
+                const prey = sim.grid.nearest(c.x, c.y, 12, o => o.kind === 'animal' && SPECIES[o.species].diet === 'herb' && !SPECIES[o.species].fly && !(o.frozen > 0));
                 if (prey) { u.state = 'fight'; u.targetId = prey.id; u.task = { kind: 'hunt' }; return; }
                 const spot = civ.findFishingSpot(c, u);
                 if (spot) { CivAI.goto(u, spot.x, spot.y, { kind: 'fish' }); return; }
