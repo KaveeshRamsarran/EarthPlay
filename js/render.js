@@ -1,0 +1,742 @@
+/* EarthPlay — renderer: baked terrain chunks, territory overlay, entities, effects, lighting, weather, minimap. */
+(function () {
+'use strict';
+const EP = globalThis.EP;
+const { T, TERRAIN, Color, Sprites } = EP;
+const TS = 8;          // world px per tile
+const CH = 32;         // tiles per chunk edge
+const TERR_S = 4;      // territory overlay px per tile
+
+const TPAL = TERRAIN.map(d => d.colors.map(c => Color.hexToRgb(c)));
+const WATER_STOPS = [[0, [14, 52, 98]], [0.45, [24, 84, 145]], [0.78, [44, 125, 186]], [1, [84, 168, 214]]];
+const FOAM = [222, 241, 250];
+const SNOWS = [[244, 248, 251], [228, 236, 244], [210, 221, 233]];
+const CARRY_COL = { food: '#c9e05a', wood: '#a8763e', stone: '#a39e96', gold: '#ffd34d' };
+
+function waterColor(f) {
+    for (let k = 1; k < WATER_STOPS.length; k++) {
+        if (f <= WATER_STOPS[k][0]) {
+            const [a0, c0] = WATER_STOPS[k - 1], [a1, c1] = WATER_STOPS[k];
+            const t = (f - a0) / (a1 - a0);
+            return [c0[0] + (c1[0] - c0[0]) * t, c0[1] + (c1[1] - c0[1]) * t, c0[2] + (c1[2] - c0[2]) * t];
+        }
+    }
+    return WATER_STOPS[WATER_STOPS.length - 1][1];
+}
+
+class Renderer {
+    constructor(canvas) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.cam = { x: 0, y: 0, zoom: 2, tz: 2, ax: null, ay: null };
+        this.settings = { borders: true, daynight: true, weather: true };
+        this.time = 0;
+        this.follow = -1;
+        this.selection = null;  // {type:'unit'|'building'|'city', id}
+        this.cursor = null;     // {tx,ty, tool, size}
+        this.lastTerr = 0;
+        this.resize();
+    }
+
+    // ------------------------------------------------------------ setup
+    attach(sim) {
+        this.sim = sim;
+        const w = sim.world;
+        this.cw = Math.ceil(w.w / CH); this.chh = Math.ceil(w.h / CH);
+        this.chunks = [];
+        for (let cy = 0; cy < this.chh; cy++) for (let cx = 0; cx < this.cw; cx++) {
+            const c = document.createElement('canvas');
+            c.width = CH * TS; c.height = CH * TS;
+            const g = c.getContext('2d');
+            this.chunks.push({ canvas: c, ctx: g, img: g.createImageData(CH * TS, CH * TS), cx, cy });
+        }
+        for (let y = 0; y < w.h; y++) for (let x = 0; x < w.w; x++) this.paintTile(x, y);
+        for (const ch of this.chunks) ch.ctx.putImageData(ch.img, 0, 0);
+        w.dirty.clear();
+        // Territory overlay
+        this.terr = document.createElement('canvas');
+        this.terr.width = w.w * TERR_S; this.terr.height = w.h * TERR_S;
+        this.terrCtx = this.terr.getContext('2d');
+        this.terrImg = this.terrCtx.createImageData(this.terr.width, this.terr.height);
+        this.terr32 = new Uint32Array(this.terrImg.data.buffer);
+        this.terrVersion = -1;
+        // Clouds
+        this.clouds = [];
+        const n = 4 + Math.round(w.w * w.h / 6000);
+        for (let i = 0; i < n; i++) this.clouds.push({ x: Math.random() * w.w * TS, y: Math.random() * w.h * TS, s: 0.7 + Math.random() * 0.9 });
+        if (!this.cloudShadow) {
+            const c = document.createElement('canvas'); c.width = Sprites.cloud.width; c.height = Sprites.cloud.height;
+            const g = c.getContext('2d'); g.drawImage(Sprites.cloud, 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = 'rgba(10,20,40,0.35)'; g.fillRect(0, 0, c.width, c.height);
+            this.cloudShadow = c;
+        }
+        this.fitWorld();
+    }
+    resize() {
+        this.dpr = Math.min(2, window.devicePixelRatio || 1);
+        this.W = this.canvas.clientWidth || window.innerWidth;
+        this.H = this.canvas.clientHeight || window.innerHeight;
+        this.canvas.width = Math.round(this.W * this.dpr);
+        this.canvas.height = Math.round(this.H * this.dpr);
+    }
+    minZoom() {
+        const w = this.sim.world;
+        return Math.min(this.W / (w.w * TS), this.H / (w.h * TS)) * 0.8;
+    }
+    fitWorld() {
+        const w = this.sim.world;
+        this.cam.x = w.w * TS / 2; this.cam.y = w.h * TS / 2;
+        this.cam.zoom = this.cam.tz = Math.max(this.minZoom(), Math.min(this.W / (w.w * TS), this.H / (w.h * TS)) * 1.05);
+    }
+    zoomAt(factor, sx, sy) {
+        this.cam.tz = EP.clamp(this.cam.tz * factor, this.minZoom(), 10);
+        this.cam.ax = sx; this.cam.ay = sy;
+    }
+    centerOn(tx, ty, zoom) {
+        this.cam.x = tx * TS; this.cam.y = ty * TS;
+        if (zoom) this.cam.zoom = this.cam.tz = EP.clamp(zoom, this.minZoom(), 10);
+    }
+    screenToTile(sx, sy) {
+        return { x: ((sx - this.W / 2) / this.cam.zoom + this.cam.x) / TS, y: ((sy - this.H / 2) / this.cam.zoom + this.cam.y) / TS };
+    }
+    tileToScreen(tx, ty) {
+        return { x: (tx * TS - this.cam.x) * this.cam.zoom + this.W / 2, y: (ty * TS - this.cam.y) * this.cam.zoom + this.H / 2 };
+    }
+
+    // ------------------------------------------------------------ terrain baking
+    paintTile(tx, ty) {
+        const w = this.sim.world, W = w.w, H = w.h;
+        const ch = this.chunks[((ty / CH) | 0) * this.cw + ((tx / CH) | 0)];
+        const data = ch.img.data, stride = CH * TS;
+        const ox = (tx % CH) * TS, oy = (ty % CH) * TS;
+        const i0 = ty * W + tx, t0 = w.terrain[i0];
+        const hAt = (x, y) => w.height[EP.clamp(y, 0, H - 1) * W + EP.clamp(x, 0, W - 1)];
+        const hl = (hAt(tx - 1, ty - 1) - hAt(tx + 1, ty + 1));
+        const land0 = t0 > 1;
+        const shade = land0 ? EP.clamp(1 + hl * 0.0065, 0.74, 1.24) * (1 + (w.height[i0] - 140) * 0.0011) : 1;
+        const structured = t0 === T.FARM || t0 === T.ROAD;
+        const tree = w.tree[i0];
+        const tpx = tree ? Sprites.treePix[tree] : null;
+        const tAt = (px, py) => {
+            const sx = EP.clamp(Math.floor(px / TS), 0, W - 1), sy = EP.clamp(Math.floor(py / TS), 0, H - 1);
+            return w.terrain[sy * W + sx];
+        };
+        for (let py = 0; py < TS; py++) for (let px = 0; px < TS; px++) {
+            const wx = tx * TS + px, wy = ty * TS + py;
+            let t = t0, si = i0;
+            if (!structured) {
+                const bx = wx >> 1, by = wy >> 1;
+                const sx = EP.clamp(Math.floor((wx + (EP.hash2(bx, by, 11) - 0.5) * 5.5) / TS), 0, W - 1);
+                const sy = EP.clamp(Math.floor((wy + (EP.hash2(bx, by, 23) - 0.5) * 5.5) / TS), 0, H - 1);
+                si = sy * W + sx;
+                const ts = w.terrain[si];
+                if (ts !== T.FARM && ts !== T.ROAD) t = ts; else si = i0;
+            }
+            let r, g, b;
+            if (t <= 1) {
+                const f = EP.clamp((w.height[si] - 20) / (EP.SEA - 20), 0, 1);
+                [r, g, b] = waterColor(f);
+                const n = (EP.hash2(wx >> 1, wy >> 1, 3) - 0.5) * 7;
+                r += n; g += n; b += n;
+                if (tAt(wx + 3, wy) > 1 || tAt(wx - 3, wy) > 1 || tAt(wx, wy + 3) > 1 || tAt(wx, wy - 3) > 1) {
+                    if (EP.hash2(wx, wy, 9) < 0.7) { r = r * 0.45 + FOAM[0] * 0.55; g = g * 0.45 + FOAM[1] * 0.55; b = b * 0.45 + FOAM[2] * 0.55; }
+                } else if (EP.hash2(wx, wy, 31) < 0.012) { r += 30; g += 30; b += 26; }
+            } else {
+                const P = TPAL[t];
+                let c;
+                switch (t) {
+                    case T.FARM: {
+                        const row = (wy + (tx & 1)) % 4;
+                        c = row === 0 ? P[3] : (EP.hash2(wx, wy, 4) < 0.5 ? P[0] : P[1]);
+                        if (row !== 0 && EP.hash2(wx, wy, 41) < 0.07) c = [217, 196, 90];
+                        break;
+                    }
+                    case T.MOUNTAIN: {
+                        const n = EP.hash2(wx, wy, 5) * 0.5 + EP.hash2(wx >> 2, wy >> 2, 6) * 0.5;
+                        c = P[(n * 4) | 0];
+                        const hh = w.height[si] + (EP.hash2(wx >> 1, wy >> 1, 12) - 0.5) * 14 - py * 0.6;
+                        if (hh > EP.SNOWCAP) c = SNOWS[EP.hash2(wx, wy, 13) < 0.55 ? 0 : (((px + py * 2 + (EP.hash2(wx >> 2, wy >> 1, 14) * 3 | 0)) % 5) === 0 ? 2 : 1)];
+                        else if (((px + py + (EP.hash2(tx, ty, 2) * 4 | 0)) % 6) === 0) c = P[3];
+                        break;
+                    }
+                    case T.HILLS: {
+                        const n = EP.hash2(wx, wy, 5) * 0.6 + EP.hash2(wx >> 2, wy >> 2, 6) * 0.4;
+                        c = P[(n * 4) | 0];
+                        if (((wy + ((wx >> 2) & 1) * 2) & 3) === 0 && EP.hash2(wx >> 2, wy, 8) < 0.6) c = P[3];
+                        break;
+                    }
+                    case T.LAVA: c = P[(EP.hash2(wx >> 1, wy >> 1, 17) * 4) | 0]; if (EP.hash2(wx, wy, 18) < 0.05) c = [255, 240, 170]; break;
+                    case T.ROAD: c = P[(EP.hash2(wx, wy, 5) * 3) | 0]; if (EP.hash2(wx, wy, 19) < 0.07) c = P[3]; break;
+                    default: {
+                        const n = EP.hash2(wx, wy, 5) * 0.55 + EP.hash2(wx >> 2, wy >> 2, 6 + t) * 0.45;
+                        c = P[EP.clamp((n * 4) | 0, 0, 3)];
+                        if (t === T.GRASS && EP.hash2(wx, wy, 44) < 0.012) c = EP.hash2(wx, wy, 45) < 0.5 ? [240, 220, 90] : [235, 120, 160];
+                    }
+                }
+                const sh = t === T.LAVA ? 1 : shade;
+                r = c[0] * sh; g = c[1] * sh; b = c[2] * sh;
+            }
+            if (tpx) {
+                const p = tpx[py * TS + px];
+                if (p) { r = p[0] * shade; g = p[1] * shade; b = p[2] * shade; }
+                else if (px > 0 && py > 0 && tpx[(py - 1) * TS + px - 1]) { r *= 0.68; g *= 0.68; b *= 0.72; }
+            }
+            const o = ((oy + py) * stride + ox + px) * 4;
+            data[o] = r; data[o + 1] = g; data[o + 2] = b; data[o + 3] = 255;
+        }
+    }
+    flushDirty() {
+        const w = this.sim.world;
+        if (!w.dirty.size) return;
+        const todo = new Set();
+        for (const i of w.dirty) {
+            const x = i % w.w, y = (i / w.w) | 0;
+            for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+                const nx = x + dx, ny = y + dy;
+                if (nx >= 0 && ny >= 0 && nx < w.w && ny < w.h) todo.add(ny * w.w + nx);
+            }
+        }
+        w.dirty.clear();
+        const rects = new Map();
+        for (const i of todo) {
+            const x = i % w.w, y = (i / w.w) | 0;
+            this.paintTile(x, y);
+            const ci = ((y / CH) | 0) * this.cw + ((x / CH) | 0);
+            const lx = x % CH, ly = y % CH;
+            const r = rects.get(ci);
+            if (!r) rects.set(ci, [lx, ly, lx, ly]);
+            else { if (lx < r[0]) r[0] = lx; if (ly < r[1]) r[1] = ly; if (lx > r[2]) r[2] = lx; if (ly > r[3]) r[3] = ly; }
+        }
+        for (const [ci, r] of rects) {
+            const ch = this.chunks[ci];
+            ch.ctx.putImageData(ch.img, 0, 0, r[0] * TS, r[1] * TS, (r[2] - r[0] + 1) * TS, (r[3] - r[1] + 1) * TS);
+        }
+    }
+    rebuildTerritory() {
+        const sim = this.sim, w = sim.world, civ = sim.civ;
+        const W = w.w, H = w.h, S = TERR_S, SW = W * S;
+        const d32 = this.terr32;
+        d32.fill(0);
+        const info = new Map();
+        for (const c of civ.cities.values()) {
+            const k = civ.kingdoms.get(c.kingdomId);
+            if (!k) continue;
+            const [r, g, b] = Color.hexToRgb(k.color);
+            info.set(c.id, { k: k.id, r, g, b });
+        }
+        const own = w.owner;
+        const kid = (x, y) => { if (x < 0 || y < 0 || x >= W || y >= H) return -1; const o = own[y * W + x]; if (o < 0) return -1; const f = info.get(o); return f ? f.k : -1; };
+        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+            const o = own[y * W + x];
+            if (o < 0) continue;
+            const f = info.get(o);
+            if (!f) continue;
+            const k = f.k;
+            const kN = kid(x, y - 1), kS = kid(x, y + 1), kW = kid(x - 1, y), kE = kid(x + 1, y);
+            const oN = y > 0 ? own[(y - 1) * W + x] : -1, oS = y < H - 1 ? own[(y + 1) * W + x] : -1, oW = x > 0 ? own[y * W + x - 1] : -1, oE = x < W - 1 ? own[y * W + x + 1] : -1;
+            const rgb = (f.b << 16) | (f.g << 8) | f.r;
+            for (let sy = 0; sy < S; sy++) for (let sx = 0; sx < S; sx++) {
+                let a = 40;
+                if ((sy === 0 && kN !== k) || (sy === S - 1 && kS !== k) || (sx === 0 && kW !== k) || (sx === S - 1 && kE !== k)) a = 235;
+                else if ((sy === 1 && kN !== k) || (sy === S - 2 && kS !== k) || (sx === 1 && kW !== k) || (sx === S - 2 && kE !== k)) a = 110;
+                else if (((sy === 0 && oN !== o) || (sy === S - 1 && oS !== o) || (sx === 0 && oW !== o) || (sx === S - 1 && oE !== o)) && ((sx + sy) & 1)) a = 120;
+                d32[(y * S + sy) * SW + x * S + sx] = (a << 24) | rgb;
+            }
+        }
+        this.terrCtx.putImageData(this.terrImg, 0, 0);
+    }
+
+    // ------------------------------------------------------------ frame
+    render(alpha, dt) {
+        const sim = this.sim, ctx = this.ctx, cam = this.cam, w = sim.world;
+        this.time += dt;
+        this.flushDirty();
+        const now = performance.now();
+        if (w.ownerVersion !== this.terrVersion && now - this.lastTerr > 250) { this.terrVersion = w.ownerVersion; this.lastTerr = now; this.rebuildTerritory(); }
+
+        // Camera: smooth zoom around anchor, follow target, clamp.
+        if (Math.abs(cam.tz - cam.zoom) > 0.0005) {
+            let before = null;
+            if (cam.ax != null) before = this.screenToTile(cam.ax, cam.ay);
+            cam.zoom += (cam.tz - cam.zoom) * Math.min(1, dt * 14);
+            if (before) { const after = this.screenToTile(cam.ax, cam.ay); cam.x += (before.x - after.x) * TS; cam.y += (before.y - after.y) * TS; }
+        } else cam.zoom = cam.tz;
+        if (this.follow >= 0) {
+            const u = sim.unitMap.get(this.follow);
+            if (u) { cam.x += (u.x * TS - cam.x) * Math.min(1, dt * 6); cam.y += (u.y * TS - cam.y) * Math.min(1, dt * 6); }
+            else this.follow = -1;
+        }
+        cam.x = EP.clamp(cam.x, 0, w.w * TS); cam.y = EP.clamp(cam.y, 0, w.h * TS);
+
+        const z = cam.zoom, dpr = this.dpr;
+        const shake = sim.fx.shakeAmt * 5;
+        const ox = Math.round((this.W / 2 - cam.x * z + (Math.random() - 0.5) * shake) * dpr);
+        const oy = Math.round((this.H / 2 - cam.y * z + (Math.random() - 0.5) * shake) * dpr);
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.fillStyle = '#0c2440';
+        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.setTransform(z * dpr, 0, 0, z * dpr, ox, oy);
+        ctx.imageSmoothingEnabled = false;
+
+        // Visible world-pixel rect
+        const vx0 = cam.x - this.W / 2 / z - 16, vy0 = cam.y - this.H / 2 / z - 16;
+        const vx1 = cam.x + this.W / 2 / z + 16, vy1 = cam.y + this.H / 2 / z + 32;
+        const tx0 = Math.max(0, (vx0 / TS) | 0), ty0 = Math.max(0, (vy0 / TS) | 0);
+        const tx1 = Math.min(w.w - 1, (vx1 / TS) | 0), ty1 = Math.min(w.h - 1, (vy1 / TS) | 0);
+        this.view = { tx0, ty0, tx1, ty1 };
+
+        // Terrain
+        for (const ch of this.chunks) {
+            const x = ch.cx * CH * TS, y = ch.cy * CH * TS;
+            if (x > vx1 || y > vy1 || x + CH * TS < vx0 || y + CH * TS < vy0) continue;
+            ctx.drawImage(ch.canvas, x, y);
+        }
+        // Water shimmer
+        if (z >= 1.1) this.drawShimmer(ctx, tx0, ty0, tx1, ty1);
+        // Territory
+        if (this.settings.borders) {
+            ctx.globalAlpha = z > 3 ? 0.7 : 1;
+            ctx.drawImage(this.terr, 0, 0, this.terr.width, this.terr.height, 0, 0, w.w * TS, w.h * TS);
+            ctx.globalAlpha = 1;
+        }
+        const lights = [];
+        this.drawFires(ctx, vx0, vy0, vx1, vy1, lights);
+        this.drawEntities(ctx, alpha, vx0, vy0, vx1, vy1, lights);
+        this.drawEffects(ctx, lights, vx0, vy0, vx1, vy1);
+        this.drawClouds(ctx, dt);
+        // Lighting
+        const dark = this.settings.daynight ? (1 - sim.env.daylight()) * 0.78 : 0;
+        if (dark > 0.02) this.drawNight(ctx, dark, lights, tx0, ty0, tx1, ty1, ox, oy);
+        if (this.settings.weather) this.drawWeather(ctx);
+        // Overlays in world space
+        ctx.setTransform(z * dpr, 0, 0, z * dpr, ox, oy);
+        this.drawCursor(ctx);
+        this.drawSelection(ctx, alpha);
+        // Screen-space
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        this.drawTexts(ctx);
+        if (sim.fx.flashAmt > 0.01) {
+            ctx.globalAlpha = Math.min(1, sim.fx.flashAmt);
+            ctx.fillStyle = sim.fx.flashColor; ctx.fillRect(0, 0, this.W, this.H);
+            ctx.globalAlpha = 1;
+        }
+    }
+
+    drawShimmer(ctx, tx0, ty0, tx1, ty1) {
+        const w = this.sim.world, t = this.time * 0.35;
+        ctx.fillStyle = 'rgba(255,255,255,0.45)';
+        for (let y = ty0; y <= ty1; y++) for (let x = tx0; x <= tx1; x++) {
+            const i = y * w.w + x;
+            if (w.terrain[i] > 1) continue;
+            const ph = (EP.hash2(x, y, 77) + t) % 1;
+            if (ph < 0.06) {
+                const s = ph / 0.06;
+                ctx.fillRect(x * TS + 1 + ((EP.hash2(x, y, 78) * 4) | 0) + s * 2, y * TS + ((EP.hash2(x, y, 79) * 7) | 0), 2 + (s < 0.5 ? 1 : 0), 1);
+            }
+        }
+    }
+    drawFires(ctx, vx0, vy0, vx1, vy1, lights) {
+        const sim = this.sim, w = sim.world;
+        const f = (this.time * 12) | 0;
+        for (const i of sim.env.fires) {
+            const x = (i % w.w) * TS, y = ((i / w.w) | 0) * TS;
+            if (x < vx0 || y < vy0 || x > vx1 || y > vy1) continue;
+            ctx.drawImage(Sprites.flame(f + i), x + 1, y - 2);
+            if (lights.length < 600 && (i & 1)) lights.push([x + 4, y + 2, 14, 'fire']);
+        }
+    }
+
+    drawEntities(ctx, alpha, vx0, vy0, vx1, vy1, lights) {
+        const sim = this.sim, civ = sim.civ, z = this.cam.zoom;
+        const list = [];
+        for (const b of civ.buildings.values()) {
+            const x = b.x * TS, y = (b.y + b.h) * TS;
+            if (x > vx1 || y < vy0 || x + b.w * TS < vx0 || y - 40 > vy1) continue;
+            list.push({ y: y - 0.1, b });
+        }
+        const dots = z < 0.75;
+        for (const u of sim.units) {
+            if (u.dead) continue;
+            const x = (u.px + (u.x - u.px) * alpha) * TS, y = (u.py + (u.y - u.py) * alpha) * TS;
+            if (x < vx0 || x > vx1 || y < vy0 || y > vy1 + 16) continue;
+            list.push({ y: y + (u.sp.fly ? 40 : 0), u, x, py: y });
+        }
+        list.sort((a, b) => a.y - b.y);
+        // Shadows first
+        if (!dots) {
+            ctx.fillStyle = 'rgba(0,0,0,0.28)';
+            for (const e of list) if (e.u && e.u.kind !== 'aquatic') {
+                const fly = e.u.sp.fly;
+                const sw = fly ? 12 : e.u.kind === 'animal' ? 6 : 5;
+                ctx.fillRect(e.x - sw / 2, e.py - 1 + (fly ? 4 : 0), sw, fly ? 3 : 2);
+            }
+        }
+        const frameT = this.time * 7;
+        for (const e of list) {
+            if (e.b) { this.drawBuilding(ctx, e.b, lights); continue; }
+            const u = e.u;
+            const k = u.kingdomId >= 0 ? civ.kingdoms.get(u.kingdomId) : null;
+            if (dots) {
+                ctx.fillStyle = k ? k.color : u.kind === 'monster' ? '#ff3355' : u.kind === 'aquatic' ? '#9fd3ff' : u.kind === 'civ' ? '#dddddd' : '#c9a36b';
+                const s = u.species === 'dragon' ? 10 : 2.4 / z;
+                ctx.fillRect(e.x - s / 2, e.py - s, s, s);
+                continue;
+            }
+            const color = k ? k.color : '#9a9a9a';
+            const frame = (u.moving || u.state === 'work') ? ((frameT + u.id * 0.37) | 0) & 1 : 0;
+            const spr = Sprites.unit(u, color, frame);
+            let s = 1;
+            if (u.kind === 'civ' && !u.adult) s = 0.7;
+            else if (u.kind === 'animal' && !u.adult) s = 0.7;
+            if (u.traits.includes('giant')) s = 1.35;
+            const sw = spr.width * s, sh = spr.height * s;
+            const lift = u.sp.fly ? 10 + Math.sin(this.time * 3 + u.id) * 2 : (u.kind === 'aquatic' ? -2 : 0);
+            const dx = Math.round(e.x - sw / 2), dy = Math.round(e.py - sh + 1 - lift);
+            if (u.kind === 'aquatic') ctx.globalAlpha = 0.75;
+            ctx.drawImage(spr, dx, dy, sw, sh);
+            if (u.hitT > 0) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.7; ctx.drawImage(spr, dx, dy, sw, sh); ctx.globalCompositeOperation = 'source-over'; }
+            ctx.globalAlpha = 1;
+            if (u.kind === 'civ' && u.adult) {
+                if (u.job === 'warrior') {
+                    const wc = EP.AGES[k ? k.age : 0].weapon;
+                    const wx = dx + (u.face > 0 ? sw - 1 : 0);
+                    if (u.species === 'elf') { ctx.fillStyle = '#8b6a45'; ctx.fillRect(wx, dy + 3, 1, 6); ctx.fillStyle = '#e8e0cc'; ctx.fillRect(wx + (u.face > 0 ? -1 : 1), dy + 4, 1, 4); }
+                    else { ctx.fillStyle = '#5c3c22'; ctx.fillRect(wx, dy + 4, 1, 6); ctx.fillStyle = wc; ctx.fillRect(wx, dy + 1, 1, 3); }
+                }
+                if (u.carry) { ctx.fillStyle = CARRY_COL[u.carry.type] || '#fff'; ctx.fillRect(Math.round(e.x) - 1, dy - 3, 3, 2); }
+                if (k && k.kingId === u.id) { ctx.fillStyle = '#ffd34d'; ctx.fillRect(dx + 2, dy - 2, 5, 1); ctx.fillRect(dx + 2, dy - 3, 1, 1); ctx.fillRect(dx + 4, dy - 3, 1, 1); ctx.fillRect(dx + 6, dy - 3, 1, 1); }
+            }
+            if (u.sick > 0 && ((this.time * 2 + u.id) % 1) < 0.5) { ctx.fillStyle = 'rgba(140,220,80,0.85)'; ctx.fillRect(Math.round(e.x), dy - 2, 1, 1); }
+            if (z >= 1.4 && u.hp < u.hpMax && u.kind !== 'aquatic') {
+                const bw = Math.max(6, sw - 2);
+                ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(Math.round(e.x - bw / 2), dy - 5, bw, 2);
+                ctx.fillStyle = u.hp / u.hpMax > 0.5 ? '#6fdc5a' : u.hp / u.hpMax > 0.25 ? '#ffc14d' : '#ff4d4d';
+                ctx.fillRect(Math.round(e.x - bw / 2), dy - 5, Math.max(1, Math.round(bw * u.hp / u.hpMax)), 1);
+            }
+            if (u.species === 'dragon' && lights.length < 600) lights.push([e.x, dy + 6, 14, 'fire']);
+        }
+    }
+    drawBuilding(ctx, b, lights) {
+        const sim = this.sim, k = sim.civ.buildingKingdom(b);
+        if (b.type === 'farm') {
+            if (!b.done) return;
+            const x = (b.x + 1) * TS + 3, y = (b.y + 1) * TS;
+            ctx.fillStyle = '#6b4a2b'; ctx.fillRect(x + 1, y, 1, 7); ctx.fillRect(x - 1, y + 2, 5, 1);
+            ctx.fillStyle = '#d9b26f'; ctx.fillRect(x, y - 1, 3, 2);
+            ctx.fillStyle = k ? k.color : '#888'; ctx.fillRect(x, y + 3, 3, 2);
+            return;
+        }
+        const spr = Sprites.building(b, k);
+        const X = b.x * TS, Yb = (b.y + b.h) * TS, top = Yb - spr.height;
+        if (!b.done) {
+            ctx.globalAlpha = 0.22; ctx.drawImage(spr, X, top); ctx.globalAlpha = 1;
+            const ph = Math.max(2, Math.round(spr.height * b.progress));
+            ctx.drawImage(spr, 0, spr.height - ph, spr.width, ph, X, Yb - ph, spr.width, ph);
+            ctx.fillStyle = '#8a6a45';
+            ctx.fillRect(X, top + 3, 1, spr.height - 3); ctx.fillRect(X + spr.width - 1, top + 3, 1, spr.height - 3);
+            for (let y = Yb - 4; y > top + 3; y -= 5) ctx.fillRect(X, y, spr.width, 1);
+        } else {
+            ctx.drawImage(spr, X, top);
+            if (b.hitT > 0) { b.hitT--; ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.5; ctx.drawImage(spr, X, top); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; }
+            if (lights.length < 600) {
+                if (b.type === 'house') lights.push([X + 4, Yb - 7, 9, 'window'], [X + 12, Yb - 7, 9, 'window']);
+                else if (b.type === 'hall') lights.push([X + 12, Yb - 8, 22, 'window']);
+                else if (b.type === 'tower') lights.push([X + 4, top + 3, 12, 'fire']);
+                else if (b.type === 'temple') lights.push([X + 8, top + 4, 18, 'magic']);
+                else lights.push([X + spr.width / 2, Yb - 5, 12, 'window']);
+            }
+        }
+        if (this.cam.zoom >= 1.2 && b.hp < b.maxHp * 0.98 && b.done) {
+            ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(X, top - 3, spr.width, 2);
+            ctx.fillStyle = b.hp / b.maxHp > 0.5 ? '#6fdc5a' : '#ff6b4d'; ctx.fillRect(X, top - 3, Math.max(1, Math.round(spr.width * b.hp / b.maxHp)), 1);
+        }
+    }
+
+    drawEffects(ctx, lights, vx0, vy0, vx1, vy1) {
+        const sim = this.sim, fx = sim.fx, pw = sim.powers;
+        // Projectiles
+        for (const p of sim.projectiles) {
+            const f = p.t / p.dur;
+            const arc = Math.sin(Math.PI * f) * Math.min(2.5, Math.hypot(p.tx - p.sx, p.ty - p.sy) * 0.18);
+            const x = p.x * TS, y = (p.y - arc) * TS;
+            if (p.kind === 'arrow') {
+                const a = Math.atan2((p.ty - p.sy) * TS - Math.cos(Math.PI * f) * arc * TS * 2, (p.tx - p.sx) * TS);
+                ctx.strokeStyle = '#5c3c22'; ctx.lineWidth = 0.8;
+                ctx.beginPath(); ctx.moveTo(x - Math.cos(a) * 3, y - Math.sin(a) * 3); ctx.lineTo(x, y); ctx.stroke();
+                ctx.fillStyle = '#e6ebf0'; ctx.fillRect(x - 0.5, y - 0.5, 1, 1);
+            } else {
+                ctx.fillStyle = '#ff7b1f'; ctx.beginPath(); ctx.arc(x, y, 2.4, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#fff3a0'; ctx.beginPath(); ctx.arc(x, y, 1.2, 0, Math.PI * 2); ctx.fill();
+                lights.push([x, y, 14, 'fire']);
+            }
+        }
+        // Falling objects
+        for (const f of pw.falling) {
+            const p = f.t / f.dur;
+            const x = EP.lerp(f.sx, f.x, p) * TS, y = EP.lerp(f.sy, f.y, p) * TS;
+            if (f.kind !== 'lavabomb') {
+                ctx.strokeStyle = `rgba(255,80,60,${0.4 + 0.4 * Math.sin(this.time * 12)})`; ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.arc(f.x * TS, f.y * TS, 4 + (1 - p) * 10, 0, Math.PI * 2); ctx.stroke();
+                ctx.fillStyle = `rgba(0,0,0,${0.15 + p * 0.25})`; ctx.beginPath(); ctx.ellipse(f.x * TS, f.y * TS, 2 + p * 6, 1 + p * 3, 0, 0, Math.PI * 2); ctx.fill();
+            }
+            if (f.kind === 'meteor') {
+                ctx.fillStyle = '#ff9f1c'; ctx.beginPath(); ctx.arc(x, y, 3.2, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#6b5a4a'; ctx.beginPath(); ctx.arc(x, y, 2.2, 0, Math.PI * 2); ctx.fill();
+                lights.push([x, y, 26, 'fire']);
+            } else if (f.kind === 'nuke') {
+                ctx.fillStyle = '#3a3f4a'; ctx.fillRect(x - 1.5, y - 4, 3, 6); ctx.fillStyle = '#ffd34d'; ctx.fillRect(x - 1.5, y - 1, 3, 1);
+                ctx.fillStyle = '#2a2d35'; ctx.fillRect(x - 2.5, y - 5, 5, 1);
+            } else { ctx.fillStyle = '#ffb43a'; ctx.fillRect(x - 1, y - 1, 2, 2); lights.push([x, y, 10, 'lava']); }
+        }
+        // Tornados
+        for (const t of pw.tornados) {
+            const x = t.x * TS, y = t.y * TS;
+            for (let k = 0; k < 12; k++) {
+                const yy = y - k * 2.6, rx = 2 + k * 1.2, sx = Math.sin(this.time * 7 + k * 0.6) * k * 0.45;
+                ctx.fillStyle = `rgba(${170 - k * 4},${160 - k * 4},${145 - k * 3},${0.22 + k * 0.012})`;
+                ctx.beginPath(); ctx.ellipse(x + sx, yy, rx, rx * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+            }
+        }
+        // Volcano glow
+        for (const v of pw.volcanoes) lights.push([v.x * TS, v.y * TS - 4, 30, 'lava']);
+        // Particles
+        for (const p of fx.particles) {
+            const x = p.x * TS, y = (p.y - p.z) * TS;
+            if (x < vx0 || x > vx1 || y < vy0 || y > vy1) continue;
+            ctx.globalAlpha = p.fade ? Math.min(1, (p.life / p.max) * 1.4) : 1;
+            ctx.fillStyle = p.color;
+            ctx.fillRect(x - p.size / 2, y - p.size / 2, p.size, p.size);
+            if (p.glow && lights.length < 700) lights.push([x, y, 5 + p.size * 2, 'warm']);
+        }
+        ctx.globalAlpha = 1;
+        // Bolts
+        for (const b of fx.bolts) {
+            const a = b.life / b.maxLife;
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = `rgba(150,180,255,${a * 0.5})`; ctx.lineWidth = 3.5;
+            ctx.beginPath(); b.pts.forEach(([x, y], i) => i ? ctx.lineTo(x * TS, y * TS) : ctx.moveTo(x * TS, y * TS)); ctx.stroke();
+            ctx.strokeStyle = `rgba(255,255,255,${a})`; ctx.lineWidth = 1.2; ctx.stroke();
+            const e = b.pts[b.pts.length - 1];
+            lights.push([e[0] * TS, e[1] * TS, 40, 'magic']);
+        }
+        for (const r of fx.rings) {
+            ctx.strokeStyle = Color.rgba(r.color, (r.life / r.maxLife) * 0.8); ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.arc(r.x * TS, r.y * TS, r.r * TS, 0, Math.PI * 2); ctx.stroke();
+        }
+        // Player rain clouds
+        for (const cl of this.sim.env.clouds) {
+            const a = Math.min(1, cl.life / 60, (360 - cl.life) / 30 + 0.2);
+            const s = cl.r * TS * 2.4 / Sprites.cloud.width;
+            ctx.globalAlpha = 0.85 * a;
+            ctx.drawImage(this.cloudShadow, cl.x * TS - Sprites.cloud.width * s / 2 + 6, cl.y * TS - Sprites.cloud.height * s / 2 + 10, Sprites.cloud.width * s, Sprites.cloud.height * s);
+            ctx.strokeStyle = 'rgba(160,200,255,0.6)'; ctx.lineWidth = 0.6;
+            ctx.beginPath();
+            for (let i = 0; i < 40; i++) {
+                const rx = (EP.hash2(i, 1, 5) - 0.5) * cl.r * TS * 1.8, ph = (EP.hash2(i, 2, 5) + this.time * 1.6) % 1;
+                const ry = (ph - 0.5) * cl.r * TS * 1.2;
+                ctx.moveTo(cl.x * TS + rx, cl.y * TS + ry - 18); ctx.lineTo(cl.x * TS + rx - 1, cl.y * TS + ry - 14);
+            }
+            ctx.stroke();
+            ctx.globalAlpha = 0.9 * a;
+            ctx.drawImage(Sprites.cloud, cl.x * TS - Sprites.cloud.width * s / 2, cl.y * TS - Sprites.cloud.height * s / 2 - 22, Sprites.cloud.width * s, Sprites.cloud.height * s);
+            ctx.globalAlpha = 1;
+        }
+    }
+    drawClouds(ctx, dt) {
+        const z = this.cam.zoom, w = this.sim.world, wind = this.sim.env.wind;
+        const a = EP.clamp((1.25 - z) / 0.9, 0, 0.38);
+        const Wp = w.w * TS, Hp = w.h * TS;
+        for (const c of this.clouds) {
+            c.x += wind.x * dt * 6; c.y += wind.y * dt * 6;
+            if (c.x < -200) c.x += Wp + 400; if (c.x > Wp + 200) c.x -= Wp + 400;
+            if (c.y < -150) c.y += Hp + 300; if (c.y > Hp + 150) c.y -= Hp + 300;
+            if (a <= 0) continue;
+            const sw = Sprites.cloud.width * c.s * 1.6, sh = Sprites.cloud.height * c.s * 1.6;
+            ctx.globalAlpha = a * 0.8;
+            ctx.drawImage(this.cloudShadow, c.x + 30, c.y + 45, sw, sh);
+            ctx.globalAlpha = a;
+            ctx.drawImage(Sprites.cloud, c.x, c.y, sw, sh);
+        }
+        ctx.globalAlpha = 1;
+    }
+    drawNight(ctx, dark, lights, tx0, ty0, tx1, ty1, ox, oy) {
+        const w = this.sim.world, z = this.cam.zoom, dpr = this.dpr;
+        // Lava glows
+        if (z >= 0.5) {
+            const step = z < 1 ? 2 : 1;
+            for (let y = ty0; y <= ty1 && lights.length < 900; y += step) for (let x = tx0; x <= tx1; x += step)
+                if (w.terrain[y * w.w + x] === T.LAVA) lights.push([x * TS + 4, y * TS + 4, 12 * step, 'lava']);
+        }
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalCompositeOperation = 'multiply';
+        const r = Math.round(255 - dark * 190), g = Math.round(255 - dark * 175), b = Math.round(255 - dark * 110);
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.setTransform(z * dpr, 0, 0, z * dpr, ox, oy);
+        ctx.globalAlpha = Math.min(0.85, dark * 1.1);
+        for (const [x, y, rad, kind] of lights) {
+            const s = Sprites.glows[kind] || Sprites.glows.warm;
+            const flick = kind === 'fire' || kind === 'lava' ? 1 + Math.sin(this.time * 9 + x) * 0.08 : 1;
+            const R = rad * flick;
+            ctx.drawImage(s, x - R, y - R, R * 2, R * 2);
+        }
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+    }
+    drawWeather(ctx) {
+        const wt = this.sim.env.weather, wi = wt.type === 'clear' ? wt.intensity * 0.5 : wt.intensity;
+        if (wi < 0.05) return;
+        ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+        ctx.fillStyle = `rgba(30,40,60,${wi * 0.22})`;
+        ctx.fillRect(0, 0, this.W, this.H);
+        const n = Math.round(wi * 260 * (this.W * this.H) / 1.4e6);
+        const wind = this.sim.env.wind.x * 0.5;
+        ctx.strokeStyle = 'rgba(190,210,240,0.45)'; ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let i = 0; i < n; i++) {
+            const x = ((EP.hash2(i, 0, 3) * this.W + this.time * 80 * wind) % this.W + this.W) % this.W;
+            const y = (EP.hash2(i, 1, 3) * this.H + this.time * (600 + EP.hash2(i, 2, 3) * 300)) % this.H;
+            ctx.moveTo(x, y); ctx.lineTo(x + wind * 6, y + 12);
+        }
+        ctx.stroke();
+    }
+    drawCursor(ctx) {
+        const c = this.cursor;
+        if (!c || !c.tool) return;
+        const z = this.cam.zoom, tool = c.tool;
+        ctx.lineWidth = 1.5 / z;
+        const cx = (Math.floor(c.tx) + 0.5) * TS, cy = (Math.floor(c.ty) + 0.5) * TS;
+        if (tool.type === 'inspect') return;
+        if (tool.type === 'spawn') {
+            ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+            ctx.beginPath(); ctx.arc(c.tx * TS, c.ty * TS, 4, 0, Math.PI * 2); ctx.stroke();
+            return;
+        }
+        const r = tool.sized ? (Math.max(0, c.size - 0.6) + 0.5) * TS : 1.5 * TS;
+        ctx.strokeStyle = tool.cat === 'destroy' ? 'rgba(255,120,90,0.9)' : 'rgba(255,255,255,0.85)';
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+        ctx.beginPath(); ctx.arc(cx, cy, r + 1.5 / z, 0, Math.PI * 2); ctx.stroke();
+        if (!tool.sized) { ctx.beginPath(); ctx.moveTo(cx - 3, cy); ctx.lineTo(cx + 3, cy); ctx.moveTo(cx, cy - 3); ctx.lineTo(cx, cy + 3); ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.stroke(); }
+    }
+    drawSelection(ctx, alpha) {
+        const sel = this.selection, sim = this.sim;
+        if (!sel) return;
+        const z = this.cam.zoom;
+        ctx.lineWidth = 1.5 / z;
+        const pulse = 0.6 + Math.sin(this.time * 5) * 0.3;
+        if (sel.type === 'unit') {
+            const u = sim.unitMap.get(sel.id);
+            if (!u) return;
+            const x = (u.px + (u.x - u.px) * alpha) * TS, y = (u.py + (u.y - u.py) * alpha) * TS;
+            ctx.strokeStyle = `rgba(255,230,120,${pulse})`;
+            ctx.beginPath(); ctx.ellipse(x, y, u.sp.fly ? 9 : 5, u.sp.fly ? 4 : 2.5, 0, 0, Math.PI * 2); ctx.stroke();
+            if (u.tx != null && u.state !== 'idle') {
+                ctx.setLineDash([2 / z * 2, 2 / z * 2]); ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+                ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(u.tx * TS, u.ty * TS); ctx.stroke(); ctx.setLineDash([]);
+            }
+        } else if (sel.type === 'building') {
+            const b = sim.civ.buildings.get(sel.id);
+            if (!b) return;
+            ctx.strokeStyle = `rgba(255,230,120,${pulse})`;
+            ctx.strokeRect(b.x * TS - 1, b.y * TS - 1, b.w * TS + 2, b.h * TS + 2);
+        } else if (sel.type === 'city') {
+            const c = sim.civ.cities.get(sel.id);
+            if (!c) return;
+            ctx.strokeStyle = `rgba(255,230,120,${pulse})`;
+            ctx.beginPath(); ctx.arc(c.x * TS, c.y * TS, c.radius * TS, 0, Math.PI * 2); ctx.stroke();
+        }
+    }
+    drawTexts(ctx) {
+        const fx = this.sim.fx;
+        ctx.font = '600 12px "Pixelify Sans", monospace';
+        ctx.textAlign = 'center';
+        for (const t of fx.texts) {
+            const p = this.tileToScreen(t.x, t.y);
+            ctx.globalAlpha = Math.min(1, t.life / 20);
+            ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillText(t.str, p.x + 1, p.y + 1);
+            ctx.fillStyle = t.color; ctx.fillText(t.str, p.x, p.y);
+        }
+        ctx.globalAlpha = 1;
+        // Label selected unit
+        const sel = this.selection;
+        if (sel && sel.type === 'unit') {
+            const u = this.sim.unitMap.get(sel.id);
+            if (u) {
+                const p = this.tileToScreen(u.x, u.y);
+                const label = u.name || EP.SPECIES[u.species].name;
+                ctx.font = '600 12px "Pixelify Sans", monospace';
+                const tw = ctx.measureText(label).width;
+                const y = p.y - 12 * this.cam.zoom - 14;
+                ctx.fillStyle = 'rgba(14,16,26,0.8)'; ctx.fillRect(p.x - tw / 2 - 5, y - 11, tw + 10, 16);
+                ctx.fillStyle = '#ffe9a8'; ctx.fillText(label, p.x, y + 1);
+            }
+        }
+    }
+
+    // Small image of the world for save slots.
+    thumbnail(maxW = 160) {
+        const w = this.sim.world, s = Math.min(1, maxW / w.w);
+        const c = document.createElement('canvas'); c.width = Math.round(w.w * s); c.height = Math.round(w.h * s);
+        const g = c.getContext('2d'); g.imageSmoothingEnabled = true;
+        for (const ch of this.chunks) g.drawImage(ch.canvas, ch.cx * CH * s, ch.cy * CH * s, CH * s, CH * s);
+        if (this.settings.borders) g.drawImage(this.terr, 0, 0, c.width, c.height);
+        return c.toDataURL('image/jpeg', 0.7);
+    }
+}
+EP.Renderer = Renderer;
+
+// ================================================================ Minimap
+class Minimap {
+    constructor(canvas, renderer) {
+        this.canvas = canvas; this.ctx = canvas.getContext('2d'); this.r = renderer;
+        this.v = -1; this.ov = -1; this.last = 0;
+    }
+    attach(sim) {
+        this.sim = sim;
+        const w = sim.world;
+        this.base = document.createElement('canvas'); this.base.width = w.w; this.base.height = w.h;
+        this.bctx = this.base.getContext('2d');
+        this.img = this.bctx.createImageData(w.w, w.h);
+        this.canvas.width = w.w * 2; this.canvas.height = w.h * 2;
+        this.v = -1;
+    }
+    rebuild() {
+        const sim = this.sim, w = sim.world, d = this.img.data;
+        const kc = new Map();
+        for (const c of sim.civ.cities.values()) { const k = sim.civ.kingdoms.get(c.kingdomId); if (k) kc.set(c.id, Color.hexToRgb(k.color)); }
+        for (let i = 0; i < w.w * w.h; i++) {
+            const t = w.terrain[i];
+            let c = t <= 1 ? waterColor(EP.clamp((w.height[i] - 20) / (EP.SEA - 20), 0, 1)) : TPAL[t][1];
+            let r = c[0], g = c[1], b = c[2];
+            if (t === T.MOUNTAIN && w.height[i] > EP.SNOWCAP) { r = 236; g = 242; b = 248; }
+            if (w.tree[i]) { r *= 0.72; g *= 0.8; b *= 0.72; }
+            const o = w.owner[i];
+            if (o >= 0 && this.r.settings.borders) { const k = kc.get(o); if (k) { r = r * 0.5 + k[0] * 0.5; g = g * 0.5 + k[1] * 0.5; b = b * 0.5 + k[2] * 0.5; } }
+            if (w.fire[i]) { r = 255; g = 120; b = 40; }
+            d[i * 4] = r; d[i * 4 + 1] = g; d[i * 4 + 2] = b; d[i * 4 + 3] = 255;
+        }
+        this.bctx.putImageData(this.img, 0, 0);
+    }
+    draw() {
+        const w = this.sim.world, now = performance.now();
+        if ((w.version !== this.v || w.ownerVersion !== this.ov || this.sim.env.fires.size) && now - this.last > 500) {
+            this.v = w.version; this.ov = w.ownerVersion; this.last = now; this.rebuild();
+        }
+        const g = this.ctx;
+        g.imageSmoothingEnabled = false;
+        g.drawImage(this.base, 0, 0, this.canvas.width, this.canvas.height);
+        // Viewport
+        const r = this.r, z = r.cam.zoom;
+        const vw = r.W / z / TS * 2, vh = r.H / z / TS * 2;
+        const vx = r.cam.x / TS * 2 - vw / 2, vy = r.cam.y / TS * 2 - vh / 2;
+        g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 3; g.strokeRect(vx, vy, vw, vh);
+        g.strokeStyle = '#ffffff'; g.lineWidth = 1.5; g.strokeRect(vx, vy, vw, vh);
+    }
+    toTile(ev) {
+        const rect = this.canvas.getBoundingClientRect(), w = this.sim.world;
+        return { x: (ev.clientX - rect.left) / rect.width * w.w, y: (ev.clientY - rect.top) / rect.height * w.h };
+    }
+}
+EP.Minimap = Minimap;
+})();

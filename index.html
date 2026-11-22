@@ -2,462 +2,103 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EarthPlay - Divine Civilization Simulator</title>
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>EarthPlay</title>
+    <meta name="description" content="A god simulator: shape a living pixel world, seed civilisations and watch them rise and fall.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Pixelify+Sans:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <!-- Launcher Screen -->
-    <div id="launcherScreen" class="launcher-screen">
-        <div class="launcher-content">
-            <div class="launcher-logo">
-                <span class="logo-earth">EARTH</span><span class="logo-play">PLAY</span>
-            </div>
-            <p class="launcher-subtitle">World Simulator</p>
-            
-            <div class="launcher-section">
-                <h3>World Size</h3>
-                <div class="button-group">
-                    <button class="launcher-btn" data-size="small">Small</button>
-                    <button class="launcher-btn selected" data-size="medium">Medium</button>
-                    <button class="launcher-btn" data-size="large">Large</button>
-                    <button class="launcher-btn" data-size="huge">Huge</button>
-                </div>
-            </div>
+    <canvas id="world"></canvas>
 
-            <div class="launcher-section">
-                <h3>World Shape</h3>
-                <div class="button-group">
-                    <button class="launcher-btn selected" data-shape="rectangular">Rectangular</button>
-                    <button class="launcher-btn" data-shape="circular">Circular</button>
-                    <button class="launcher-btn" data-shape="island">Island</button>
-                    <button class="launcher-btn" data-shape="archipelago">Archipelago</button>
-                </div>
+    <!-- ============================== Title screen -->
+    <section id="title-screen">
+        <div class="title-card">
+            <h1 class="logo"><span class="l1">EARTH</span><span class="l2">PLAY</span></h1>
+            <p class="tagline">Shape a living world. Watch civilisations rise — and fall.</p>
+            <button id="btn-continue" class="btn big ghost" hidden>Continue<small></small></button>
+            <div id="title-form"></div>
+            <div class="title-actions">
+                <button id="btn-title-load" class="btn">Load world</button>
+                <button id="btn-create" class="btn primary big">Create world</button>
             </div>
-
-            <div class="launcher-section">
-                <h3>World Seed (Optional)</h3>
-                <input type="text" id="worldSeed" placeholder="Leave empty for random seed">
-            </div>
-
-            <button id="startGameBtn" class="start-btn">
-                <span class="btn-text">START GAME</span>
-                <span class="btn-glow"></span>
-            </button>
         </div>
+    </section>
+
+    <!-- ============================== In-game HUD -->
+    <div id="hud" hidden>
+        <header class="topbar">
+            <div class="tb-group stats">
+                <span class="mini-logo">EP</span>
+                <span class="stat" title="Current year"><b id="hud-year">Year 0</b></span>
+                <span class="stat sky" id="hud-sky" title="Time of day & weather">☀</span>
+                <span class="stat" title="People in realms"><i class="dot people"></i><b id="hud-pop">0</b><small>people</small></span>
+                <span class="stat" title="All living creatures"><i class="dot life"></i><b id="hud-life">0</b><small>creatures</small></span>
+                <span class="stat" title="Standing realms"><i class="dot realms"></i><b id="hud-realms">0</b><small>realms</small></span>
+            </div>
+            <div class="tb-group speed" role="group" aria-label="Simulation speed">
+                <button data-speed="0" title="Pause (Space)" aria-label="Pause"><svg viewBox="0 0 16 16"><rect x="3" y="2" width="3.5" height="12" rx="1"/><rect x="9.5" y="2" width="3.5" height="12" rx="1"/></svg></button>
+                <button data-speed="1" title="Normal speed (1)">1×</button>
+                <button data-speed="2" title="Fast (2)">2×</button>
+                <button data-speed="5" title="Faster (3)">5×</button>
+                <button data-speed="10" title="Fastest (4)">10×</button>
+            </div>
+            <div class="tb-group actions">
+                <button id="btn-borders" class="tb-btn" title="Realm borders (B)">Borders</button>
+                <button id="btn-realms" class="tb-btn" data-panel-btn="realms" title="Realms (K)">Realms</button>
+                <button id="btn-chronicle" class="tb-btn" data-panel-btn="chronicle" title="Chronicle (C)">Chronicle</button>
+                <button id="btn-stats" class="tb-btn" data-panel-btn="stats" title="Statistics (G)">Stats</button>
+                <span class="sep"></span>
+                <button id="btn-save" class="tb-btn" title="Save (Ctrl+S quick-saves)">Save</button>
+                <button id="btn-load" class="tb-btn" title="Load (Ctrl+O)">Load</button>
+                <button id="btn-settings" class="icon-btn" title="Settings" aria-label="Settings"><svg viewBox="0 0 16 16"><path d="M8 5.2a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6Zm6.1 3.6-1.4.5a4.9 4.9 0 0 1-.5 1.2l.6 1.3-1.1 1.1-1.3-.6c-.4.2-.8.4-1.2.5L8.8 14H7.2l-.5-1.4a4.9 4.9 0 0 1-1.2-.5l-1.3.6-1.1-1.1.6-1.3a4.9 4.9 0 0 1-.5-1.2L1.9 8.8V7.2l1.4-.5c.1-.4.3-.8.5-1.2l-.6-1.3 1.1-1.1 1.3.6c.4-.2.8-.4 1.2-.5L7.2 2h1.6l.5 1.4c.4.1.8.3 1.2.5l1.3-.6 1.1 1.1-.6 1.3c.2.4.4.8.5 1.2l1.4.5v1.4Z"/></svg></button>
+                <button id="btn-help" class="icon-btn" title="How to play (H)" aria-label="Help">?</button>
+                <button id="btn-menu" class="tb-btn accent" title="Create a new world">New world</button>
+            </div>
+        </header>
+
+        <div id="feed" aria-live="polite"></div>
+
+        <aside id="panel" hidden><div id="panel-body"></div></aside>
+
+        <div id="minimap-wrap">
+            <button id="btn-minimap" class="mm-toggle" title="Toggle minimap (M)" aria-label="Toggle minimap">▾</button>
+            <canvas id="minimap"></canvas>
+        </div>
+
+        <nav id="dock" aria-label="God powers">
+            <div id="dock-cats"></div>
+            <div class="dock-row">
+                <div id="dock-tools"></div>
+                <div id="dock-brush">
+                    <label for="brush-size">Brush</label>
+                    <input id="brush-size" type="range" min="1" max="20" value="3">
+                    <span id="brush-val">3</span>
+                </div>
+            </div>
+        </nav>
     </div>
 
-    <!-- Game Screen -->
-    <div id="gameScreen" class="game-screen" style="display: none;">
-        <div class="container">
-            <!-- Main Canvas Area -->
-            <div class="main-content">
-                <div class="canvas-container">
-                    <canvas id="gameCanvas"></canvas>
-                    <div class="crosshair"></div>
-                </div>
-                <div class="info-bar">
-                    <span id="mouseInfo">X: 0, Y: 0</span>
-                    <span id="fpsInfo">FPS: 60</span>
-                </div>
-            </div>
+    <div id="tooltip" hidden></div>
+    <div id="toasts"></div>
+    <div id="modal-root" hidden></div>
+    <div id="loading" hidden><div class="spinner"></div><p id="loading-text">Shaping the world…</p></div>
 
-            <!-- Bottom Sidebar with Tabs -->
-            <div class="bottom-sidebar">
-                <!-- Tab Navigation -->
-                <div class="tab-navigation">
-                    <button class="tab-btn active" data-tab="terrain">
-                        <canvas class="tab-icon" data-icon="terrain_tab"></canvas>
-                        <span>Terrain</span>
-                    </button>
-                    <button class="tab-btn" data-tab="creatures">
-                        <canvas class="tab-icon" data-icon="creatures_tab"></canvas>
-                        <span>Creatures</span>
-                    </button>
-                    <button class="tab-btn" data-tab="civilizations">
-                        <canvas class="tab-icon" data-icon="civilizations_tab"></canvas>
-                        <span>Kingdoms</span>
-                    </button>
-                    <button class="tab-btn" data-tab="powers">
-                        <canvas class="tab-icon" data-icon="powers_tab"></canvas>
-                        <span>Powers</span>
-                    </button>
-                    <button class="tab-btn" data-tab="hazards">
-                        <canvas class="tab-icon" data-icon="hazards_tab"></canvas>
-                        <span>Hazards</span>
-                    </button>
-                    <button class="tab-btn" data-tab="stats">
-                        <canvas class="tab-icon" data-icon="stats_tab"></canvas>
-                        <span>Stats</span>
-                    </button>
-                    <button class="tab-btn" data-tab="tools">
-                        <canvas class="tab-icon" data-icon="tools_tab"></canvas>
-                        <span>Tools</span>
-                    </button>
-                </div>
-
-                <!-- Tab Content -->
-                <div class="tabs-container">
-                    <!-- Terrain Tab -->
-                    <div class="tab-content active" id="terrain-tab">
-                        <div class="tab-header">Terrain Tools</div>
-                        <div class="tool-grid">
-                            <button class="brush-btn selected" data-brush="grass" title="Grass">
-                                <canvas class="btn-icon" data-icon="grass"></canvas>
-                                <span class="btn-label">Grass</span>
-                            </button>
-                            <button class="brush-btn" data-brush="dirt" title="Dirt">
-                                <canvas class="btn-icon" data-icon="dirt"></canvas>
-                                <span class="btn-label">Dirt</span>
-                            </button>
-                            <button class="brush-btn" data-brush="stone" title="Stone">
-                                <canvas class="btn-icon" data-icon="stone"></canvas>
-                                <span class="btn-label">Stone</span>
-                            </button>
-                            <button class="brush-btn" data-brush="sand" title="Sand">
-                                <canvas class="btn-icon" data-icon="sand"></canvas>
-                                <span class="btn-label">Sand</span>
-                            </button>
-                            <button class="brush-btn" data-brush="water" title="Water">
-                                <canvas class="btn-icon" data-icon="water"></canvas>
-                                <span class="btn-label">Water</span>
-                            </button>
-                            <button class="brush-btn" data-brush="lava" title="Lava">
-                                <canvas class="btn-icon" data-icon="lava"></canvas>
-                                <span class="btn-label">Lava</span>
-                            </button>
-                            <button class="brush-btn" data-brush="forest" title="Forest">
-                                <canvas class="btn-icon" data-icon="forest"></canvas>
-                                <span class="btn-label">Forest</span>
-                            </button>
-                            <button class="brush-btn" data-brush="mountain" title="Mountain">
-                                <canvas class="btn-icon" data-icon="mountain"></canvas>
-                                <span class="btn-label">Mountain</span>
-                            </button>
-                        </div>
-                        <div class="control-section">
-                            <label>Brush Size: <span id="brushSizeDisplay">3</span></label>
-                            <input type="range" id="brushSize" min="1" max="20" value="3">
-                        </div>
-                    </div>
-
-                    <!-- Creatures Tab -->
-                    <div class="tab-content" id="creatures-tab">
-                        <div class="tab-header">Creature Tools</div>
-                        <div class="tool-grid">
-                            <button class="creature-btn" data-creature="human" title="Humans">
-                                <canvas class="btn-icon" data-icon="human"></canvas>
-                                <span class="btn-label">Human</span>
-                            </button>
-                            <button class="creature-btn" data-creature="elf" title="Elves">
-                                <canvas class="btn-icon" data-icon="elf"></canvas>
-                                <span class="btn-label">Elf</span>
-                            </button>
-                            <button class="creature-btn" data-creature="dwarf" title="Dwarves">
-                                <canvas class="btn-icon" data-icon="dwarf"></canvas>
-                                <span class="btn-label">Dwarf</span>
-                            </button>
-                            <button class="creature-btn" data-creature="orc" title="Orcs">
-                                <canvas class="btn-icon" data-icon="orc"></canvas>
-                                <span class="btn-label">Orc</span>
-                            </button>
-                            <button class="creature-btn" data-creature="undead" title="Undead">
-                                <canvas class="btn-icon" data-icon="undead"></canvas>
-                                <span class="btn-label">Undead</span>
-                            </button>
-                            <button class="creature-btn" data-creature="wolf" title="Wolves">
-                                <canvas class="btn-icon" data-icon="wolf"></canvas>
-                                <span class="btn-label">Wolf</span>
-                            </button>
-                            <button class="creature-btn" data-creature="bear" title="Bears">
-                                <canvas class="btn-icon" data-icon="bear"></canvas>
-                                <span class="btn-label">Bear</span>
-                            </button>
-                            <button class="creature-btn" data-creature="deer" title="Deer">
-                                <canvas class="btn-icon" data-icon="deer"></canvas>
-                                <span class="btn-label">Deer</span>
-                            </button>
-                            <button class="creature-btn" data-creature="eagle" title="Eagles">
-                                <canvas class="btn-icon" data-icon="eagle"></canvas>
-                                <span class="btn-label">Eagle</span>
-                            </button>
-                            <button class="creature-btn" data-creature="fish" title="Fish">
-                                <canvas class="btn-icon" data-icon="fish"></canvas>
-                                <span class="btn-label">Fish</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Civilizations Tab -->
-                    <div class="tab-content" id="civilizations-tab">
-                        <div class="tab-header">Civilizations & Kingdoms</div>
-                        <div class="control-section">
-                            <h4>Active Kingdoms</h4>
-                            <div id="kingdomsList" class="kingdoms-list">
-                                <p class="no-kingdoms">No kingdoms yet. Spawn races to create civilizations!</p>
-                            </div>
-                        </div>
-                        <div class="control-section">
-                            <h4>Create Kingdom</h4>
-                            <div class="tool-grid kingdom-grid">
-                                <button class="kingdom-btn" data-kingdom="human" title="Human Kingdom">
-                                    <canvas class="btn-icon" data-icon="human"></canvas>
-                                    <span class="btn-label">Human</span>
-                                </button>
-                                <button class="kingdom-btn" data-kingdom="elf" title="Elf Kingdom">
-                                    <canvas class="btn-icon" data-icon="elf"></canvas>
-                                    <span class="btn-label">Elf</span>
-                                </button>
-                                <button class="kingdom-btn" data-kingdom="dwarf" title="Dwarf Kingdom">
-                                    <canvas class="btn-icon" data-icon="dwarf"></canvas>
-                                    <span class="btn-label">Dwarf</span>
-                                </button>
-                                <button class="kingdom-btn" data-kingdom="orc" title="Orc Kingdom">
-                                    <canvas class="btn-icon" data-icon="orc"></canvas>
-                                    <span class="btn-label">Orc</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Divine Powers Tab -->
-                    <div class="tab-content" id="powers-tab">
-                        <div class="tab-header">Divine Powers</div>
-                        <div class="tool-grid power-grid">
-                            <button class="power-btn" data-power="meteor" title="Meteor Strike">
-                                <canvas class="btn-icon" data-icon="meteor"></canvas>
-                                <span class="btn-label">Meteor</span>
-                            </button>
-                            <button class="power-btn" data-power="nuke" title="Nuclear Explosion">
-                                <canvas class="btn-icon" data-icon="nuke"></canvas>
-                                <span class="btn-label">Nuke</span>
-                            </button>
-                            <button class="power-btn" data-power="dragon" title="Dragon Strike">
-                                <canvas class="btn-icon" data-icon="dragon"></canvas>
-                                <span class="btn-label">Dragon</span>
-                            </button>
-                            <button class="power-btn" data-power="ufo" title="UFO Abduction">
-                                <canvas class="btn-icon" data-icon="ufo"></canvas>
-                                <span class="btn-label">UFO</span>
-                            </button>
-                            <button class="power-btn" data-power="plague" title="Plague">
-                                <canvas class="btn-icon" data-icon="plague"></canvas>
-                                <span class="btn-label">Plague</span>
-                            </button>
-                            <button class="power-btn" data-power="tsunami" title="Tsunami">
-                                <canvas class="btn-icon" data-icon="tsunami"></canvas>
-                                <span class="btn-label">Tsunami</span>
-                            </button>
-                            <button class="power-btn" data-power="lightning" title="Lightning Storm">
-                                <canvas class="btn-icon" data-icon="lightning"></canvas>
-                                <span class="btn-label">Lightning</span>
-                            </button>
-                            <button class="power-btn" data-power="volcano" title="Volcano Eruption">
-                                <canvas class="btn-icon" data-icon="volcano"></canvas>
-                                <span class="btn-label">Volcano</span>
-                            </button>
-                            <button class="power-btn" data-power="earthquake" title="Earthquake">
-                                <canvas class="btn-icon" data-icon="earthquake"></canvas>
-                                <span class="btn-label">Quake</span>
-                            </button>
-                            <button class="power-btn" data-power="wildfire" title="Wildfire">
-                                <canvas class="btn-icon" data-icon="wildfire"></canvas>
-                                <span class="btn-label">Fire</span>
-                            </button>
-                        </div>
-                        <div class="control-section" id="powerCooldownsContainer">
-                        </div>
-                    </div>
-
-                    <!-- Hazards Tab -->
-                    <div class="tab-content" id="hazards-tab">
-                        <div class="tab-header">Natural Hazards</div>
-                        <div class="tool-grid">
-                            <button class="hazard-btn" data-hazard="meteor" title="Meteor">
-                                <canvas class="btn-icon" data-icon="meteor"></canvas>
-                                <span class="btn-label">Meteor</span>
-                            </button>
-                            <button class="hazard-btn" data-hazard="plague" title="Plague">
-                                <canvas class="btn-icon" data-icon="plague"></canvas>
-                                <span class="btn-label">Plague</span>
-                            </button>
-                            <button class="hazard-btn" data-hazard="lightning" title="Lightning">
-                                <canvas class="btn-icon" data-icon="lightning"></canvas>
-                                <span class="btn-label">Lightning</span>
-                            </button>
-                            <button class="hazard-btn" data-hazard="volcano" title="Volcano">
-                                <canvas class="btn-icon" data-icon="volcano"></canvas>
-                                <span class="btn-label">Volcano</span>
-                            </button>
-                            <button class="hazard-btn" data-hazard="tsunami" title="Tsunami">
-                                <canvas class="btn-icon" data-icon="tsunami"></canvas>
-                                <span class="btn-label">Tsunami</span>
-                            </button>
-                            <button class="hazard-btn" data-hazard="blizzard" title="Blizzard">
-                                <canvas class="btn-icon" data-icon="blizzard"></canvas>
-                                <span class="btn-label">Blizzard</span>
-                            </button>
-                            <button class="hazard-btn" data-hazard="earthquake" title="Earthquake">
-                                <canvas class="btn-icon" data-icon="earthquake"></canvas>
-                                <span class="btn-label">Quake</span>
-                            </button>
-                            <button class="hazard-btn" data-hazard="wildfire" title="Wildfire">
-                                <canvas class="btn-icon" data-icon="wildfire"></canvas>
-                                <span class="btn-label">Fire</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Stats Tab -->
-                    <div class="tab-content" id="stats-tab">
-                        <div class="tab-header">World Statistics</div>
-                        <div class="stats-grid">
-                            <div class="stat-item"><span class="stat-label">Population:</span><span class="stat-value" id="populationCount">0</span></div>
-                            <div class="stat-item"><span class="stat-label">Humans:</span><span class="stat-value" id="humanCount">0</span></div>
-                            <div class="stat-item"><span class="stat-label">Elves:</span><span class="stat-value" id="elfCount">0</span></div>
-                            <div class="stat-item"><span class="stat-label">Dwarves:</span><span class="stat-value" id="dwarfCount">0</span></div>
-                            <div class="stat-item"><span class="stat-label">Orcs:</span><span class="stat-value" id="orcCount">0</span></div>
-                            <div class="stat-item"><span class="stat-label">Undead:</span><span class="stat-value" id="undeadCount">0</span></div>
-                            <div class="stat-item"><span class="stat-label">Wolves:</span><span class="stat-value" id="wolfCount">0</span></div>
-                            <div class="stat-item"><span class="stat-label">Bears:</span><span class="stat-value" id="bearCount">0</span></div>
-                            <div class="stat-item"><span class="stat-label">Deer:</span><span class="stat-value" id="deerCount">0</span></div>
-                            <div class="stat-item"><span class="stat-label">Eagles:</span><span class="stat-value" id="eagleCount">0</span></div>
-                            <div class="stat-item"><span class="stat-label">Fish:</span><span class="stat-value" id="fishCount">0</span></div>
-                            <div class="stat-item year-stat"><span class="stat-label">Year:</span><span class="stat-value" id="yearCount">0</span></div>
-                        </div>
-                        <div class="control-section">
-                            <label>Overlays:</label>
-                            <div class="overlay-buttons">
-                                <button class="tool-btn overlay-btn" data-overlay="biome" title="Show Biome Colors">
-                                    <canvas class="btn-icon small" data-icon="biome"></canvas>
-                                    <span>Biome</span>
-                                </button>
-                                <button class="tool-btn overlay-btn" data-overlay="population" title="Population Density">
-                                    <canvas class="btn-icon small" data-icon="population"></canvas>
-                                    <span>Pop</span>
-                                </button>
-                                <button class="tool-btn overlay-btn" data-overlay="temperature" title="Temperature">
-                                    <canvas class="btn-icon small" data-icon="temperature"></canvas>
-                                    <span>Temp</span>
-                                </button>
-                                <button class="tool-btn overlay-btn" data-overlay="kingdoms" title="Kingdom Borders">
-                                    <canvas class="btn-icon small" data-icon="kingdoms"></canvas>
-                                    <span>Realm</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Tools Tab -->
-                    <div class="tab-content" id="tools-tab">
-                        <div class="tab-header">Game Tools</div>
-                        <div class="tool-buttons">
-                            <button class="tool-btn" data-tool="pause">
-                                <canvas class="btn-icon small" data-icon="pause"></canvas>
-                                <span>Pause</span>
-                            </button>
-                            <button class="tool-btn" id="stepBtn">
-                                <canvas class="btn-icon small" data-icon="step"></canvas>
-                                <span>Step</span>
-                            </button>
-                            <button class="tool-btn" id="clearBtn">
-                                <canvas class="btn-icon small" data-icon="clear"></canvas>
-                                <span>Clear</span>
-                            </button>
-                            <button class="tool-btn" id="generateBtn">
-                                <canvas class="btn-icon small" data-icon="generate"></canvas>
-                                <span>Generate</span>
-                            </button>
-                            <button class="tool-btn" id="resetBtn">
-                                <canvas class="btn-icon small" data-icon="reset"></canvas>
-                                <span>Reset</span>
-                            </button>
-                        </div>
-                        <div class="control-section">
-                            <label>Game Speed:</label>
-                            <div class="speed-control">
-                                <input type="range" id="speed" min="0.1" max="3" step="0.1" value="1">
-                                <span id="speedDisplay">1x</span>
-                            </div>
-                        </div>
-                        <div class="control-section">
-                            <label>Save / Load:</label>
-                            <div class="save-load-buttons">
-                                <button class="tool-btn save-btn" id="saveBtn">
-                                    <canvas class="btn-icon small" data-icon="save"></canvas>
-                                    <span>Save</span>
-                                </button>
-                                <button class="tool-btn load-btn" id="loadBtn">
-                                    <canvas class="btn-icon small" data-icon="load"></canvas>
-                                    <span>Load</span>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="control-section">
-                            <label>World Seed: <span id="seedDisplay" class="seed-display"></span></label>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Game Controls & Shortcuts -->
-        <div class="game-controls-panel">
-            <div class="controls-header">CONTROLS & SHORTCUTS</div>
-            <div class="controls-grid">
-                <div class="control-item">
-                    <div class="control-key">SCROLL</div>
-                    <div class="control-desc">Zoom In/Out</div>
-                </div>
-                <div class="control-item">
-                    <div class="control-key">MIDDLE MOUSE</div>
-                    <div class="control-desc">Drag to Pan</div>
-                </div>
-                <div class="control-item">
-                    <div class="control-key">LEFT CLICK</div>
-                    <div class="control-desc">Place/Cast</div>
-                </div>
-                <div class="control-item">
-                    <div class="control-key">ARROW KEYS</div>
-                    <div class="control-desc">Pan Camera</div>
-                </div>
-                <div class="control-item">
-                    <div class="control-key">SPACE</div>
-                    <div class="control-desc">Pause Game</div>
-                </div>
-                <div class="control-item">
-                    <div class="control-key">. (PERIOD)</div>
-                    <div class="control-desc">Step One Tick</div>
-                </div>
-                <div class="control-item">
-                    <div class="control-key">TAB</div>
-                    <div class="control-desc">Cycle Tabs</div>
-                </div>
-                <div class="control-item">
-                    <div class="control-key">1-4</div>
-                    <div class="control-desc">Set Speed</div>
-                </div>
-                <div class="control-item">
-                    <div class="control-key">CTRL+S</div>
-                    <div class="control-desc">Quick Save</div>
-                </div>
-                <div class="control-item">
-                    <div class="control-key">CTRL+L</div>
-                    <div class="control-desc">Quick Load</div>
-                </div>
-            </div>
-            <div class="controls-info">
-                TIP: Create kingdoms → Cast divine powers → Watch civilizations battle!
-            </div>
-        </div>
-    </div>
-
-    <script src="spriteGenerator.js"></script>
-    <script src="soundManager.js"></script>
-    <script src="civilizationSystem.js"></script>
-    <script src="destructionPowerSystem.js"></script>
-    <script src="biomeSystem.js"></script>
-    <script src="game.js"></script>
+    <script src="js/core.js"></script>
+    <script src="js/data.js"></script>
+    <script src="js/world.js"></script>
+    <script src="js/units.js"></script>
+    <script src="js/civ.js"></script>
+    <script src="js/powers.js"></script>
+    <script src="js/sim.js"></script>
+    <script src="js/save.js"></script>
+    <script src="js/sprites.js"></script>
+    <script src="js/render.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/main.js"></script>
 </body>
 </html>

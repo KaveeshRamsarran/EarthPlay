@@ -1,0 +1,9 @@
+{
+  "name": "earthplay",
+  "version": "3.0.0",
+  "private": true,
+  "description": "A browser god simulator: shape a living pixel world and watch civilisations rise and fall.",
+  "scripts": {
+    "test": "node tests/sim.test.js"
+  }
+}

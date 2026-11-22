@@ -1,4 +1,36 @@
-# 📋 Complete Change Log - Worldbox Clone Expansion
+# Changelog
+
+## 3.0 — Full overhaul
+
+A ground-up rewrite of the engine, visuals and gameplay.
+
+**Engine**
+- Modular code under `js/` with a DOM-free simulation that runs headless (`npm test`).
+- Fixed-timestep simulation (30 ticks/s) decoupled from rendering, with interpolation; speeds 1×/2×/5×/10×.
+- Full-window camera with smooth zoom-to-cursor, drag/keyboard/pinch panning, minimap navigation and creature following.
+- Typed-array world storage, spatial hashing for neighbour queries, landmass flood-fill so AI only targets reachable places.
+- Seeded generation: fBm continents, ridged mountains, downhill rivers, temperature/moisture biomes; four land shapes and three sea levels.
+
+**Living world**
+- Creatures age, starve, breed, herd, graze, hunt, flee and migrate; obstacle-avoiding steering.
+- Realms with territory, towns, jobs, resources, construction, footpath roads, five research ages, rulers and succession, heroes, settler expeditions, diplomacy, wars, sieges, conquest, rebellion and collapse — all written to a Chronicle.
+- Fire that spreads with the wind, regrowing forests, cooling lava, healing scorched land, weather with storms.
+
+**Powers**
+- 44 tools: terrain sculpting/painting, 12 species, nature blessings, 9 disasters, and realm meddling (Discord, Harmony, Rebellion, Prosperity).
+
+**Visuals & UI**
+- Procedural pixel art for every creature, building (by race, age and realm colour), tree and icon.
+- Baked terrain with organic biome edges, hill shading, depth-graded water, shoreline foam and shimmer.
+- Day/night lighting with lit windows and glowing lava, rain, drifting clouds, particles, lightning, shockwaves.
+- New HUD: tool dock, inspector for creatures/buildings/towns/realms, realm list, chronicle, statistics with population history, event feed, settings, help, responsive layout.
+- Title screen over a live demo world.
+
+**Saves** — five slots plus autosave with thumbnails (gzip-compressed), export/import to file.
+
+**Removed** — the previous single-file engine, sprite editor, launcher/quickstart pages and the old status documents, all superseded by the above (they remain in git history).
+
+---
 
 ## Version 2.0 - Expansion Update
 
