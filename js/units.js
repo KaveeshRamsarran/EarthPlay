@@ -24,6 +24,7 @@ class Unit {
         this.lastAttacker = -1; this.lastHitTick = -999; this.hitT = 0;
         this.hunger = 75; this.sick = 0;
         this.kills = 0; this.xp = 0; this.level = 1;
+        this.wpn = 0; this.arm = 0; this.boarded = 0; // forged gear tiers (EP.GEAR); vehicle id when aboard
         this.stuck = 0; this.lastD = Infinity; this.detour = 0; this.detourT = 0;
         this.idleT = 0; this.lonely = 0;
         this.name = sp.kind === 'civ' ? EP.Units.makeName(sim.rng, species) : null;
@@ -58,6 +59,7 @@ const Units = EP.Units = {
         if (k) { const age = EP.AGES[k.age]; hp *= age.hp; atk *= age.atk; }
         const lv = 1 + (u.level - 1) * 0.12;
         hp *= lv; atk *= lv;
+        if (u.wpn) atk *= EP.GEAR[u.wpn].atk;
         if (u.job === 'warrior') { hp *= 1.25; atk *= 1.3; }
         const ratio = u.hpMax ? u.hp / u.hpMax : 1;
         u.hpMax = Math.round(hp); u.atk = atk; u.speed = speed;
@@ -189,6 +191,7 @@ const Units = EP.Units = {
 
     damage(sim, u, amt, attacker, cause) {
         if (u.dead) return;
+        if (u.arm) amt *= 1 - EP.GEAR[u.arm].def;
         u.hp -= amt; u.hitT = 6;
         if (attacker) { u.lastAttacker = attacker.id; u.lastHitTick = sim.tick; }
         const sp = SPECIES[u.species];
@@ -256,6 +259,11 @@ const Units = EP.Units = {
         if (u.hitT > 0) u.hitT--;
         u.age += 1 / EP.TICKS_PER_YEAR;
         if (u.age > u.lifespan) { Units.kill(sim, u, 'old age', null); return; }
+        if (u.boarded > 0) { // riding a ship: the vehicle moves us
+            if (!sim.vehicles.map.has(u.boarded)) { u.boarded = 0; u.task = null; u.state = 'idle'; }
+            else return;
+        }
+
 
         const w = sim.world;
         const ti = (u.y | 0) * w.w + (u.x | 0);

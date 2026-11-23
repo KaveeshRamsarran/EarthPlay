@@ -182,6 +182,11 @@ input[type=text]::placeholder { color: var(--muted); }
 .res > div { display: flex; flex-direction: column; align-items: center; padding: 5px 2px 6px; background: var(--well); box-shadow: inset 0 3px 0 0 rgba(0, 0, 0, 0.35); font-size: 12px; color: var(--text-2); }
 .res i { width: 10px; height: 10px; background: var(--rc); margin-bottom: 3px; box-shadow: var(--frame-2); }
 .res b { color: var(--text); font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.res.ores { grid-template-columns: repeat(3, 1fr); margin-bottom: 8px; }
+.res.ores > div { font-size: 11px; }
+.res.ores b { font-size: 14px; }
+.res > div.none { opacity: .45; }
+.kv.gear b { font-size: 13px; }
 .ulink { display: flex; align-items: center; gap: 10px; padding: 6px 8px; background: var(--panel-2); box-shadow: var(--frame-2); color: var(--text); margin: 2px; }
 .ulink canvas { width: 28px; height: 28px; }
 .towns { display: flex; flex-direction: column; gap: 6px; }

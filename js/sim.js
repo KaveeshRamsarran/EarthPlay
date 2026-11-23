@@ -25,6 +25,7 @@ class Sim extends EP.Emitter {
         this.fx = new EP.Effects();
         this.env = new EP.Environment(this);
         this.civ = new EP.CivSystem(this);
+        this.vehicles = new EP.VehicleSystem(this);
         this.powers = new EP.Powers(this);
         this.projectiles = [];
         this.pending = [];
@@ -58,13 +59,14 @@ class Sim extends EP.Emitter {
         if (w.landDirty && this.tick % 30 === 0) w.computeLandmasses();
         if (this.tick % 2 === 0 || this.gridStale) {
             this.grid.clear();
-            for (let i = 0; i < this.units.length; i++) { const u = this.units[i]; if (!u.dead) this.grid.insert(u); }
+            for (let i = 0; i < this.units.length; i++) { const u = this.units[i]; if (!u.dead && !(u.boarded > 0)) this.grid.insert(u); }
             this.gridStale = false;
         }
         this.env.update();
         const n = this.units.length;
         for (let i = 0; i < n; i++) { const u = this.units[i]; if (!u.dead) Units.update(this, u); }
         this.civ.update();
+        this.vehicles.update();
         this.powers.update();
         this.updateProjectiles();
         this.fx.update();
@@ -115,6 +117,8 @@ class Sim extends EP.Emitter {
                 this.fx.burst(p.tx, p.ty, 6, { colors: ['#9fffb0', '#ffffff', '#7dd3fc'], speed: 0.05, life: 16, glow: true });
             } else {
                 for (const u of this.grid.collect(p.tx, p.ty, 1.6, u => u.kind !== 'monster')) Units.damage(this, u, p.dmg, src, 'dragonfire');
+                this.vehicles.damageAt(p.tx, p.ty, 1.6, p.dmg);
+
                 for (let k = 0; k < 3; k++) this.env.ignite(p.tx + this.rng.int(-1, 1), p.ty + this.rng.int(-1, 1));
                 const w = this.world;
                 if (w.inb(p.tx | 0, p.ty | 0)) { const b = w.bld[w.idx(p.tx | 0, p.ty | 0)]; if (b >= 0) this.civ.damageBuilding(b, p.dmg * 2, src); }

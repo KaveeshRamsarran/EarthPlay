@@ -11,7 +11,8 @@ const TPAL = TERRAIN.map(d => d.colors.map(c => Color.hexToRgb(c)));
 const WATER_STOPS = [[0, [14, 52, 98]], [0.45, [24, 84, 145]], [0.78, [44, 125, 186]], [1, [84, 168, 214]]];
 const FOAM = [222, 241, 250];
 const SNOWS = [[244, 248, 251], [228, 236, 244], [210, 221, 233]];
-const CARRY_COL = { food: '#c9e05a', wood: '#a8763e', stone: '#a39e96', gold: '#ffd34d' };
+const CARRY_COL = Object.fromEntries(Object.entries(EP.RES_INFO).map(([k, v]) => [k, v.color]));
+const isWaterish = t => t <= 1 || t === T.BRIDGE;
 
 function waterColor(f) {
     for (let k = 1; k < WATER_STOPS.length; k++) {
@@ -59,7 +60,13 @@ class Renderer {
         this.terrCtx = this.terr.getContext('2d');
         this.terrImg = this.terrCtx.createImageData(this.terr.width, this.terr.height);
         this.terr32 = new Uint32Array(this.terrImg.data.buffer);
+        this.fill = document.createElement('canvas');
+        this.fill.width = w.w; this.fill.height = w.h;
+        this.fillCtx = this.fill.getContext('2d');
+        this.fillImg = this.fillCtx.createImageData(w.w, w.h);
+        this.fill32 = new Uint32Array(this.fillImg.data.buffer);
         this.terrVersion = -1;
+        this.litQueue = [];
         // Clouds
         this.clouds = [];
         const n = 4 + Math.round(w.w * w.h / 6000);
@@ -113,7 +120,10 @@ class Renderer {
         const hl = (hAt(tx - 1, ty - 1) - hAt(tx + 1, ty + 1));
         const land0 = t0 > 1;
         const shade = land0 ? EP.clamp(1 + hl * 0.0065, 0.74, 1.24) * (1 + (w.height[i0] - 140) * 0.0011) : 1;
-        const structured = t0 === T.FARM || t0 === T.ROAD;
+        const structured = t0 === T.FARM || t0 === T.ROAD || t0 === T.PAVED || t0 === T.BRIDGE;
+        const ore = w.ore[i0], opx = ore ? Sprites.orePix[ore][(EP.hash2(tx, ty, 61) * 3) | 0] : null;
+        let bridgeH = false;
+        if (t0 === T.BRIDGE) { const n = w.t(tx, ty - 1), s = w.t(tx, ty + 1); bridgeH = n <= 1 || s <= 1; }
         const tree = w.tree[i0];
         const tpx = tree ? Sprites.treePix[tree] : null;
         const tAt = (px, py) => {
@@ -129,7 +139,7 @@ class Renderer {
                 const sy = EP.clamp(Math.floor((wy + (EP.hash2(bx, by, 23) - 0.5) * 5.5) / TS), 0, H - 1);
                 si = sy * W + sx;
                 const ts = w.terrain[si];
-                if (ts !== T.FARM && ts !== T.ROAD) t = ts; else si = i0;
+                if (ts !== T.FARM && ts !== T.ROAD && ts !== T.PAVED && ts !== T.BRIDGE) t = ts; else si = i0;
             }
             let r, g, b;
             if (t <= 1) {
@@ -137,7 +147,7 @@ class Renderer {
                 [r, g, b] = waterColor(f);
                 const n = (EP.hash2(wx >> 1, wy >> 1, 3) - 0.5) * 7;
                 r += n; g += n; b += n;
-                if (tAt(wx + 3, wy) > 1 || tAt(wx - 3, wy) > 1 || tAt(wx, wy + 3) > 1 || tAt(wx, wy - 3) > 1) {
+                if (!isWaterish(tAt(wx + 3, wy)) || !isWaterish(tAt(wx - 3, wy)) || !isWaterish(tAt(wx, wy + 3)) || !isWaterish(tAt(wx, wy - 3))) {
                     if (EP.hash2(wx, wy, 9) < 0.7) { r = r * 0.45 + FOAM[0] * 0.55; g = g * 0.45 + FOAM[1] * 0.55; b = b * 0.45 + FOAM[2] * 0.55; }
                 } else if (EP.hash2(wx, wy, 31) < 0.012) { r += 30; g += 30; b += 26; }
             } else {
@@ -166,15 +176,28 @@ class Renderer {
                     }
                     case T.LAVA: c = P[(EP.hash2(wx >> 1, wy >> 1, 17) * 4) | 0]; if (EP.hash2(wx, wy, 18) < 0.05) c = [255, 240, 170]; break;
                     case T.ROAD: c = P[(EP.hash2(wx, wy, 5) * 3) | 0]; if (EP.hash2(wx, wy, 19) < 0.07) c = P[3]; break;
+                    case T.PAVED: { // cobbles with mortar lines
+                        const row = wy % 3, off = ((wy / 3) | 0) & 1 ? 2 : 0;
+                        c = row === 2 || (wx + off) % 4 === 3 ? P[3] : P[(EP.hash2((wx + off) >> 2, wy, 5) * 3) | 0];
+                        break;
+                    }
+                    case T.BRIDGE: { // planks over water, rails on the edges
+                        const along = bridgeH ? px : py, across = bridgeH ? py : px;
+                        if (across === 0 || across === 7) { const wc = waterColor(0.85); c = wc; }
+                        else if (across === 1 || across === 6) c = P[3];
+                        else c = along % 2 ? P[1] : (EP.hash2(wx, wy, 5) < 0.5 ? P[0] : P[2]);
+                        break;
+                    }
                     default: {
                         const n = EP.hash2(wx, wy, 5) * 0.55 + EP.hash2(wx >> 2, wy >> 2, 6 + t) * 0.45;
                         c = P[EP.clamp((n * 4) | 0, 0, 3)];
                         if (t === T.GRASS && EP.hash2(wx, wy, 44) < 0.012) c = EP.hash2(wx, wy, 45) < 0.5 ? [240, 220, 90] : [235, 120, 160];
                     }
                 }
-                const sh = t === T.LAVA ? 1 : shade;
+                const sh = t === T.LAVA || t === T.BRIDGE ? 1 : shade;
                 r = c[0] * sh; g = c[1] * sh; b = c[2] * sh;
             }
+            if (opx) { const p = opx[py * TS + px]; if (p) { r = p[0]; g = p[1]; b = p[2]; } }
             if (tpx) {
                 const p = tpx[py * TS + px];
                 if (p) { r = p[0] * shade; g = p[1] * shade; b = p[2] * shade; }
@@ -214,8 +237,8 @@ class Renderer {
     rebuildTerritory() {
         const sim = this.sim, w = sim.world, civ = sim.civ;
         const W = w.w, H = w.h, S = TERR_S, SW = W * S;
-        const d32 = this.terr32;
-        d32.fill(0);
+        const d32 = this.terr32, f32 = this.fill32;
+        d32.fill(0); f32.fill(0);
         const info = new Map();
         for (const c of civ.cities.values()) {
             const k = civ.kingdoms.get(c.kingdomId);
@@ -234,6 +257,7 @@ class Renderer {
             const kN = kid(x, y - 1), kS = kid(x, y + 1), kW = kid(x - 1, y), kE = kid(x + 1, y);
             const oN = y > 0 ? own[(y - 1) * W + x] : -1, oS = y < H - 1 ? own[(y + 1) * W + x] : -1, oW = x > 0 ? own[y * W + x - 1] : -1, oE = x < W - 1 ? own[y * W + x + 1] : -1;
             const rgb = (f.b << 16) | (f.g << 8) | f.r;
+            f32[y * W + x] = (255 << 24) | rgb;
             for (let sy = 0; sy < S; sy++) for (let sx = 0; sx < S; sx++) {
                 let a = 40;
                 if ((sy === 0 && kN !== k) || (sy === S - 1 && kS !== k) || (sx === 0 && kW !== k) || (sx === S - 1 && kE !== k)) a = 235;
@@ -243,6 +267,7 @@ class Renderer {
             }
         }
         this.terrCtx.putImageData(this.terrImg, 0, 0);
+        this.fillCtx.putImageData(this.fillImg, 0, 0);
     }
 
     // ------------------------------------------------------------ frame
@@ -292,12 +317,15 @@ class Renderer {
         }
         // Water shimmer
         if (z >= 1.1) this.drawShimmer(ctx, tx0, ty0, tx1, ty1);
-        // Territory
+        // Territory: solid realm colours when zoomed out, crisp borders up close.
         if (this.settings.borders) {
+            const fa = EP.clamp(0.66 - z * 0.3, 0, 0.5);
+            if (fa > 0.01) { ctx.globalAlpha = fa; ctx.drawImage(this.fill, 0, 0, w.w, w.h, 0, 0, w.w * TS, w.h * TS); }
             ctx.globalAlpha = z > 3 ? 0.7 : 1;
             ctx.drawImage(this.terr, 0, 0, this.terr.width, this.terr.height, 0, 0, w.w * TS, w.h * TS);
             ctx.globalAlpha = 1;
         }
+        this.litQueue.length = 0;
         const lights = [];
         this.drawFires(ctx, vx0, vy0, vx1, vy1, lights);
         this.drawEntities(ctx, alpha, vx0, vy0, vx1, vy1, lights);
@@ -313,6 +341,8 @@ class Renderer {
         this.drawSelection(ctx, alpha);
         // Screen-space
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        this.drawWars(ctx);
+        this.drawRealmLabels(ctx);
         this.drawTexts(ctx);
         if (sim.fx.flashAmt > 0.01) {
             ctx.globalAlpha = Math.min(1, sim.fx.flashAmt);
@@ -354,8 +384,14 @@ class Renderer {
             list.push({ y: y - 0.1, b });
         }
         const dots = z < 0.75;
+        for (const v of sim.vehicles.list) {
+            if (v.dead) continue;
+            const x = (v.px + (v.x - v.px) * alpha) * TS, y = (v.py + (v.y - v.py) * alpha) * TS;
+            if (x < vx0 - 16 || x > vx1 + 16 || y < vy0 || y > vy1 + 16) continue;
+            list.push({ y: y + 1, v, x, py: y });
+        }
         for (const u of sim.units) {
-            if (u.dead) continue;
+            if (u.dead || u.boarded > 0) continue;
             const x = (u.px + (u.x - u.px) * alpha) * TS, y = (u.py + (u.y - u.py) * alpha) * TS;
             if (x < vx0 || x > vx1 || y < vy0 || y > vy1 + 16) continue;
             list.push({ y: y + (u.sp.fly ? 40 : 0), u, x, py: y });
@@ -374,6 +410,7 @@ class Renderer {
         const frameT = this.time * 7;
         for (const e of list) {
             if (e.b) { this.drawBuilding(ctx, e.b, lights); continue; }
+            if (e.v) { this.drawVehicle(ctx, e.v, e.x, e.py, lights, dots); continue; }
             const u = e.u;
             const k = u.kingdomId >= 0 ? civ.kingdoms.get(u.kingdomId) : null;
             if (dots) {
@@ -405,11 +442,14 @@ class Renderer {
             }
             if (u.madT > 0 && ((this.time * 4 + u.id) & 1)) { ctx.fillStyle = '#ff3b3b'; ctx.fillRect(Math.round(e.x) - 2, dy - 4, 1, 1); ctx.fillRect(Math.round(e.x) + 1, dy - 4, 1, 1); ctx.fillRect(Math.round(e.x) - 1, dy - 3, 2, 1); }
             if (u.kind === 'civ' && u.adult) {
-                if (u.job === 'warrior') {
-                    const wc = EP.AGES[k ? k.age : 0].weapon;
-                    const wx = dx + (u.face > 0 ? sw - 1 : 0);
-                    if (u.species === 'elf') { ctx.fillStyle = '#8b6a45'; ctx.fillRect(wx, dy + 3, 1, 6); ctx.fillStyle = '#e8e0cc'; ctx.fillRect(wx + (u.face > 0 ? -1 : 1), dy + 4, 1, 4); }
-                    else { ctx.fillStyle = '#5c3c22'; ctx.fillRect(wx, dy + 4, 1, 6); ctx.fillStyle = wc; ctx.fillRect(wx, dy + 1, 1, 3); }
+                const wx = dx + (u.face > 0 ? sw - 1 : 0);
+                if (u.job === 'warrior' || (u.wpn && (u.state === 'fight' || u.state === 'siege'))) this.drawWeapon(ctx, u, wx, dy);
+                else if (!u.carry && z >= 1.5 && (u.job === 'miner' || u.job === 'woodcutter' || u.job === 'smith')) {
+                    ctx.fillStyle = '#7a5230'; ctx.fillRect(wx, dy + 4, 1, 5);
+                    ctx.fillStyle = '#9aa3ab';
+                    if (u.job === 'miner') ctx.fillRect(wx - 1, dy + 3, 3, 1);
+                    else if (u.job === 'smith') ctx.fillRect(wx - 1, dy + 3, 3, 2);
+                    else ctx.fillRect(wx + (u.face > 0 ? 1 : -1), dy + 4, 1, 2);
                 }
                 if (u.carry) { ctx.fillStyle = CARRY_COL[u.carry.type] || '#fff'; ctx.fillRect(Math.round(e.x) - 1, dy - 3, 3, 2); }
                 if (k && k.kingId === u.id) { ctx.fillStyle = '#ffd34d'; ctx.fillRect(dx + 2, dy - 2, 5, 1); ctx.fillRect(dx + 2, dy - 3, 1, 1); ctx.fillRect(dx + 4, dy - 3, 1, 1); ctx.fillRect(dx + 6, dy - 3, 1, 1); }
@@ -427,6 +467,52 @@ class Renderer {
                 else if (u.species === 'icegolem') lights.push([e.x, dy + 4, 12, 'magic']);
             }
         }
+    }
+    // Forged weapons: the race decides the shape, the metal decides the colour.
+    drawWeapon(ctx, u, wx, dy) {
+        const metal = EP.GEAR[u.wpn || 0].color, f = u.face > 0 ? 1 : -1;
+        const R = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); };
+        switch (u.species) {
+            case 'elf':
+                R(wx, dy + 3, 1, 6, u.wpn ? metal : '#8b6a45');
+                R(wx - f, dy + 2, 1, 1, u.wpn ? metal : '#8b6a45'); R(wx - f, dy + 9, 1, 1, u.wpn ? metal : '#8b6a45');
+                R(wx - f, dy + 3, 1, 6, '#e8e0cc');
+                break;
+            case 'dwarf':
+                R(wx, dy + 3, 1, 6, '#5c3c22');
+                R(wx - 1, dy + 2, 3, 2, metal); R(wx + f, dy + 1, 1, 4, metal);
+                break;
+            case 'orc':
+                R(wx, dy + 4, 1, 5, '#3d2b1c');
+                R(f > 0 ? wx : wx - 1, dy + 1, 2, 4, metal); R(f > 0 ? wx + 1 : wx - 1, dy + 1, 1, 1, Color.shade(metal, 0.7));
+                break;
+            default: // sword
+                R(wx, dy + 7, 1, 2, '#5c3c22'); R(wx - 1, dy + 6, 3, 1, u.wpn >= 3 ? '#ffcf3a' : '#8a6a3c');
+                R(wx, dy + 1, 1, 5, metal); R(wx, dy, 1, 1, Color.shade(metal, 1.15));
+        }
+    }
+    drawVehicle(ctx, v, x, y, lights, dots) {
+        const k = this.sim.civ.kingdoms.get(v.kingdomId), color = k ? k.color : '#9a9a9a';
+        if (dots) { ctx.fillStyle = color; const s = 3 / this.cam.zoom; ctx.fillRect(x - s / 2, y - s, s, s); return; }
+        const sea = EP.VEHICLES[v.type].sea;
+        const frame = ((this.time * (sea ? 2 : 6) + v.id * 0.3) | 0) & 1;
+        const spr = EP.BuildingArt.vehicle(v.type, color, v.moving || !sea ? frame : 0, v.face < 0);
+        const bob = sea ? Math.round(Math.sin(this.time * 2.2 + v.id) * 0.6) : 0;
+        const dx = Math.round(x - spr.width / 2), dy = Math.round(y + (sea ? 3 : 2) - spr.height + bob);
+        if (!sea) { ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(dx + 2, Math.round(y) + 1, spr.width - 4, 2); }
+        ctx.drawImage(spr, dx, dy);
+        if (v.hitT > 0) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.6; ctx.drawImage(spr, dx, dy); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; }
+        // Passengers peek over the gunwale.
+        if (v.pass && v.pass.length) {
+            const n = Math.min(5, v.pass.length);
+            for (let j = 0; j < n; j++) {
+                const u = this.sim.unitMap.get(v.pass[j]);
+                const hx = dx + Math.round(spr.width / 2 - n + j * 2), hy = dy + spr.height - 8;
+                ctx.fillStyle = u && u.skin ? u.skin : '#e0ac69'; ctx.fillRect(hx, hy, 1, 1);
+                ctx.fillStyle = color; ctx.fillRect(hx, hy + 1, 1, 1);
+            }
+        }
+        if (lights.length < 600) lights.push([x, dy + 4, sea ? 10 : 7, 'window']);
     }
     drawBeam(ctx, u, x, y0, lights) {
         const t = this.sim.unitMap.get(u.targetId);
@@ -453,8 +539,9 @@ class Renderer {
             ctx.fillStyle = k ? k.color : '#888'; ctx.fillRect(x, y + 3, 3, 2);
             return;
         }
-        const spr = Sprites.building(b, k);
-        const X = b.x * TS, Yb = (b.y + b.h) * TS, top = Yb - spr.height;
+        const art = EP.BuildingArt.building(b.type, k ? k.race : 'human', k ? k.color : '#888888', k ? k.age : 0);
+        const spr = art.img;
+        const X = b.x * TS - 1, Yb = (b.y + b.h) * TS + 1, top = Yb - spr.height;
         if (!b.done) {
             ctx.globalAlpha = 0.22; ctx.drawImage(spr, X, top); ctx.globalAlpha = 1;
             const ph = Math.max(2, Math.round(spr.height * b.progress));
@@ -465,18 +552,194 @@ class Renderer {
         } else {
             ctx.drawImage(spr, X, top);
             if (b.hitT > 0) { b.hitT--; ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.5; ctx.drawImage(spr, X, top); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; }
+            this.animateBuilding(ctx, b, art, X, top, k);
+            this.litQueue.push([art.lit, X, top, b.id]);
             if (lights.length < 600) {
-                if (b.type === 'house') lights.push([X + 4, Yb - 7, 9, 'window'], [X + 12, Yb - 7, 9, 'window']);
-                else if (b.type === 'hall') lights.push([X + 12, Yb - 8, 22, 'window']);
-                else if (b.type === 'tower') lights.push([X + 4, top + 3, 12, 'fire']);
-                else if (b.type === 'temple') lights.push([X + 8, top + 4, 18, 'magic']);
-                else lights.push([X + spr.width / 2, Yb - 5, 12, 'window']);
+                const m = art.marks;
+                for (let j = 0; j < m.windows.length && j < 3; j++) lights.push([X + m.windows[j][0] + 1, top + m.windows[j][1] + 1, 7, 'window']);
+                for (const f of m.forge) lights.push([X + f[0], top + f[1], 12, 'fire']);
+                if (b.type === 'tower') lights.push([X + 5, top + 4, 12, 'fire']);
+                else if (b.type === 'temple') lights.push([X + spr.width / 2, top + 4, 18, 'magic']);
             }
         }
         if (this.cam.zoom >= 1.2 && b.hp < b.maxHp * 0.98 && b.done) {
             ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(X, top - 3, spr.width, 2);
             ctx.fillStyle = b.hp / b.maxHp > 0.5 ? '#6fdc5a' : '#ff6b4d'; ctx.fillRect(X, top - 3, Math.max(1, Math.round(spr.width * b.hp / b.maxHp)), 1);
         }
+    }
+
+    // Chimney smoke, waving banners, turning windmill sails, a flickering forge.
+    animateBuilding(ctx, b, art, X, top, k) {
+        const z = this.cam.zoom, t = this.time, m = art.marks;
+        if (z < 0.9) return;
+        const seed = EP.hash2(b.id, 3, 9);
+        const wind = this.sim.env.wind.x;
+        const smoky = b.type === 'smithy';
+        for (const c of m.chimneys) {
+            const n = smoky ? 5 : 3;
+            for (let j = 0; j < n; j++) {
+                const ph = (t * (smoky ? 0.55 : 0.35) + j / n + seed) % 1;
+                const s = 1 + Math.round(ph * (smoky ? 3 : 2.5));
+                const sx = X + c[0] + Math.sin(ph * 5 + b.id) * 1.2 + ph * wind * 5 - s / 2, sy = top + c[1] - 1 - ph * (smoky ? 14 : 11);
+                ctx.globalAlpha = (smoky ? 0.65 : 0.5) * (1 - ph);
+                ctx.fillStyle = smoky ? '#8a8580' : '#d9d4cc';
+                ctx.fillRect(Math.round(sx), Math.round(sy), s, s);
+            }
+        }
+        ctx.globalAlpha = 1;
+        if (m.flags.length) {
+            const col = k ? k.color : '#888888', dk = Color.shade(col, 0.72);
+            for (const f of m.flags) {
+                const fx = X + f[0] + 1, fy = top + f[1];
+                const ph = ((t * 3 + b.id * 0.7) | 0) % 3;
+                ctx.fillStyle = col;
+                ctx.fillRect(fx, fy, 4, 1);
+                ctx.fillRect(fx, fy + 1, ph === 1 ? 5 : 4, 1);
+                ctx.fillStyle = dk;
+                ctx.fillRect(fx, fy + 2, ph === 2 ? 3 : 4, 1);
+                if (ph === 0) ctx.fillRect(fx + 4, fy + 1, 1, 1);
+            }
+        }
+        for (const h of m.hub) {
+            const hx = X + h[0], hy = top + h[1], a0 = t * 1.4 + b.id;
+            for (let s = 0; s < 4; s++) {
+                const a = a0 + s * Math.PI / 2, ca = Math.cos(a), sa = Math.sin(a);
+                for (let r = 1; r <= 9; r++) {
+                    ctx.fillStyle = '#5c3c22';
+                    ctx.fillRect(Math.round(hx + ca * r), Math.round(hy + sa * r), 1, 1);
+                    if (r >= 3) { ctx.fillStyle = '#efe6d0'; ctx.fillRect(Math.round(hx + ca * r - sa * 1.4), Math.round(hy + sa * r + ca * 1.4), 1, 1); }
+                }
+            }
+            ctx.fillStyle = '#3d2b1c'; ctx.fillRect(hx - 1, hy - 1, 2, 2);
+        }
+        for (const f of m.forge) {
+            const fl = 0.55 + Math.sin(t * 11 + b.id) * 0.25 + Math.sin(t * 23) * 0.15;
+            ctx.globalAlpha = fl; ctx.fillStyle = '#ffd36a'; ctx.fillRect(X + f[0], top + f[1], 1, 1);
+            for (let j = 0; j < 2; j++) {
+                const ph = (t * 1.6 + j * 0.5 + seed) % 1;
+                ctx.globalAlpha = 1 - ph; ctx.fillStyle = j ? '#ffb43a' : '#fff3a0';
+                ctx.fillRect(Math.round(X + f[0] + Math.sin((Math.floor(t * 1.6 + j * 0.5) + j) * 7.3) * 2), Math.round(top + f[1] - ph * 6), 1, 1);
+            }
+            ctx.globalAlpha = 1;
+        }
+    }
+
+    // Red battle arrows between realms at war, crossed swords where they meet.
+    drawWars(ctx) {
+        const sim = this.sim, civ = sim.civ, z = this.cam.zoom;
+        const alpha = z > 4 ? 0.35 : 0.9;
+        const seen = new Set();
+        for (const a of civ.kingdoms.values()) {
+            if (!a.alive) continue;
+            for (const bid of Object.keys(a.wars)) {
+                const b = civ.kingdoms.get(+bid);
+                if (!b || !b.alive) continue;
+                const key = a.id < b.id ? a.id + ':' + b.id : b.id + ':' + a.id;
+                if (seen.has(key)) continue;
+                seen.add(key);
+                // Each side marches on its war target, or on the nearest enemy town.
+                const fronts = [];
+                for (const [s, o] of [[a, b], [b, a]]) {
+                    let tc = civ.cities.get(s.warTarget);
+                    if (tc && tc.kingdomId !== o.id) tc = null;
+                    let best = null, bd = Infinity;
+                    for (const id of s.cities) {
+                        const c = civ.cities.get(id); if (!c) continue;
+                        if (tc) { const d = EP.dist2(c.x, c.y, tc.x, tc.y); if (d < bd) { bd = d; best = [c, tc]; } }
+                        else for (const oid of o.cities) { const oc = civ.cities.get(oid); if (!oc) continue; const d = EP.dist2(c.x, c.y, oc.x, oc.y); if (d < bd) { bd = d; best = [c, oc]; } }
+                    }
+                    if (best) fronts.push([s, best[0], best[1], !!tc]);
+                }
+                if (!fronts.length) continue;
+                let mid = null;
+                for (const [s, from, to, marching] of fronts) {
+                    const p0 = this.tileToScreen(from.x, from.y), p1 = this.tileToScreen(to.x, to.y);
+                    const m = this.drawArrow(ctx, p0, p1, s.color, marching, alpha, s.id < (s === a ? b.id : a.id) ? 1 : -1);
+                    if (!mid) mid = m;
+                }
+                if (mid) {
+                    const spr = Sprites.icon('war_swords');
+                    const pulse = 1 + Math.sin(this.time * 6) * 0.12, sc = 2.6 * pulse;
+                    ctx.globalAlpha = Math.min(1, alpha + 0.1);
+                    ctx.fillStyle = 'rgba(150,10,0,0.6)'; ctx.strokeStyle = '#1a0a10'; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.arc(mid.x, mid.y, 17 * pulse, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                    ctx.imageSmoothingEnabled = false;
+                    ctx.drawImage(spr, Math.round(mid.x - spr.width * sc / 2), Math.round(mid.y - spr.height * sc / 2), spr.width * sc, spr.height * sc);
+                    ctx.globalAlpha = 1;
+                }
+            }
+        }
+    }
+    drawArrow(ctx, p0, p1, color, marching, alpha, side) {
+        const dx = p1.x - p0.x, dy = p1.y - p0.y, len = Math.hypot(dx, dy);
+        if (len < 20) return { x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2 };
+        const ux = dx / len, uy = dy / len, nx = -uy * side, ny = ux * side;
+        // Start and stop short of the towns, bow outward so two opposing arrows don't overlap.
+        const s = { x: p0.x + ux * 14, y: p0.y + uy * 14 }, e = { x: p1.x - ux * 16, y: p1.y - uy * 16 };
+        const bow = Math.min(60, len * 0.18);
+        const c = { x: (s.x + e.x) / 2 + nx * bow, y: (s.y + e.y) / 2 + ny * bow };
+        ctx.globalAlpha = alpha;
+        ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.quadraticCurveTo(c.x, c.y, e.x, e.y);
+        ctx.strokeStyle = 'rgba(26,10,16,0.9)'; ctx.lineWidth = 9; ctx.stroke();
+        ctx.strokeStyle = '#ff3a2e'; ctx.lineWidth = 5.5;
+        if (marching) { ctx.setLineDash([9, 6]); ctx.lineDashOffset = -this.time * 22; }
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.globalAlpha = alpha * 0.8; ctx.stroke(); ctx.globalAlpha = alpha;
+        // Head
+        const tx = e.x - c.x, ty = e.y - c.y, tl = Math.hypot(tx, ty) || 1, hx = tx / tl, hy = ty / tl;
+        const hw = 10, hl = 16;
+        ctx.beginPath();
+        ctx.moveTo(e.x + hx * 4, e.y + hy * 4);
+        ctx.lineTo(e.x - hx * hl - hy * hw, e.y - hy * hl + hx * hw);
+        ctx.lineTo(e.x - hx * hl + hy * hw, e.y - hy * hl - hx * hw);
+        ctx.closePath();
+        ctx.fillStyle = '#ff3a2e'; ctx.fill();
+        ctx.strokeStyle = 'rgba(26,10,16,0.9)'; ctx.lineWidth = 1.5; ctx.stroke();
+        ctx.globalAlpha = 1; ctx.lineCap = 'butt';
+        return { x: 0.25 * s.x + 0.5 * c.x + 0.25 * e.x, y: 0.25 * s.y + 0.5 * c.y + 0.25 * e.y };
+    }
+    // Kingdom banners over capitals when zoomed out; town names at middle zoom.
+    drawRealmLabels(ctx) {
+        const sim = this.sim, civ = sim.civ, z = this.cam.zoom;
+        if (z > 3.4) return;
+        const a = z < 2.6 ? 1 : (3.4 - z) / 0.8;
+        ctx.textAlign = 'center';
+        const outline = (str, x, y, col) => {
+            ctx.fillStyle = '#1a1230';
+            for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, 1], [-1, 1], [1, -1], [0, 2]]) ctx.fillText(str, x + ox, y + oy);
+            ctx.fillStyle = col; ctx.fillText(str, x, y);
+        };
+        ctx.globalAlpha = a;
+        if (z > 0.9) {
+            ctx.font = '500 11px "Pixelify Sans", monospace';
+            for (const c of civ.cities.values()) {
+                const k = civ.kingdoms.get(c.kingdomId);
+                if (!k || k.capital === c.id) continue;
+                const p = this.tileToScreen(c.x, c.y + 2.2);
+                if (p.x < -50 || p.y < -20 || p.x > this.W + 50 || p.y > this.H + 20) continue;
+                outline(c.name, Math.round(p.x), Math.round(p.y + 12), '#f2ecd8');
+            }
+        }
+        for (const k of civ.kingdoms.values()) {
+            if (!k.alive) continue;
+            const c = civ.cities.get(k.capital);
+            if (!c) continue;
+            const p = this.tileToScreen(c.x, c.y + 2.2);
+            if (p.x < -120 || p.y < -40 || p.x > this.W + 120 || p.y > this.H + 40) continue;
+            const x = Math.round(p.x), y = Math.round(p.y + 14);
+            ctx.font = '700 13px "Pixelify Sans", monospace';
+            const tw = ctx.measureText(k.name).width;
+            const bn = Sprites.banner(k.color, k.sym);
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(bn, Math.round(x - tw / 2 - 24), y - 15, 20, 24);
+            outline(k.name, x, y, '#ffffff');
+            ctx.font = '500 10px "Pixelify Sans", monospace';
+            const war = Object.keys(k.wars).length;
+            outline(`${civ.rankName(k)} · ${k.pop}${war ? ' · at war' : ''}`, x, y + 12, war ? '#ff8a7a' : '#f2ecd8');
+        }
+        ctx.globalAlpha = 1;
     }
 
     drawEffects(ctx, lights, vx0, vy0, vx1, vy1) {
@@ -637,6 +900,16 @@ class Renderer {
         }
         ctx.globalAlpha = 1;
         ctx.globalCompositeOperation = 'source-over';
+        // Lit windows glow through the dark.
+        if (this.litQueue.length) {
+            ctx.globalAlpha = Math.min(1, dark * 1.6);
+            for (const [img, x, y, id] of this.litQueue) {
+                // Late at night a few homes go dark.
+                if (dark > 0.6 && EP.hash2(id, (this.sim.tick / 600) | 0, 4) < 0.25) continue;
+                ctx.drawImage(img, x, y);
+            }
+            ctx.globalAlpha = 1;
+        }
     }
     drawWeather(ctx) {
         const wt = this.sim.env.weather, wi = wt.type === 'clear' ? wt.intensity * 0.5 : wt.intensity;
@@ -690,6 +963,12 @@ class Renderer {
                 ctx.setLineDash([2 / z * 2, 2 / z * 2]); ctx.strokeStyle = 'rgba(255,255,255,0.4)';
                 ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(u.tx * TS, u.ty * TS); ctx.stroke(); ctx.setLineDash([]);
             }
+        } else if (sel.type === 'vehicle') {
+            const v = sim.vehicles.map.get(sel.id);
+            if (!v) return;
+            const x = (v.px + (v.x - v.px) * alpha) * TS, y = (v.py + (v.y - v.py) * alpha) * TS;
+            ctx.strokeStyle = `rgba(255,230,120,${pulse})`;
+            ctx.beginPath(); ctx.ellipse(x, y + 2, 9, 4, 0, 0, Math.PI * 2); ctx.stroke();
         } else if (sel.type === 'building') {
             const b = sim.civ.buildings.get(sel.id);
             if (!b) return;
@@ -746,6 +1025,8 @@ class Renderer {
 EP.Renderer = Renderer;
 
 // ================================================================ Minimap
+const OREC = Object.fromEntries(Object.entries(EP.ORE_INFO).map(([k, o]) => [k, Color.hexToRgb(o.color)]));
+
 class Minimap {
     constructor(canvas, renderer) {
         this.canvas = canvas; this.ctx = canvas.getContext('2d'); this.r = renderer;
@@ -770,8 +1051,9 @@ class Minimap {
             let r = c[0], g = c[1], b = c[2];
             if (t === T.MOUNTAIN && w.height[i] > EP.SNOWCAP) { r = 236; g = 242; b = 248; }
             if (w.tree[i]) { r *= 0.72; g *= 0.8; b *= 0.72; }
+            if (w.ore[i]) { const oc = OREC[w.ore[i]]; r = r * 0.4 + oc[0] * 0.6; g = g * 0.4 + oc[1] * 0.6; b = b * 0.4 + oc[2] * 0.6; }
             const o = w.owner[i];
-            if (o >= 0 && this.r.settings.borders) { const k = kc.get(o); if (k) { r = r * 0.5 + k[0] * 0.5; g = g * 0.5 + k[1] * 0.5; b = b * 0.5 + k[2] * 0.5; } }
+            if (o >= 0 && this.r.settings.borders) { const k = kc.get(o); if (k) { r = r * 0.38 + k[0] * 0.62; g = g * 0.38 + k[1] * 0.62; b = b * 0.38 + k[2] * 0.62; } }
             if (w.fire[i]) { r = 255; g = 120; b = 40; }
             d[i * 4] = r; d[i * 4 + 1] = g; d[i * 4 + 2] = b; d[i * 4 + 3] = 255;
         }

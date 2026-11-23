@@ -17,6 +17,9 @@ class World {
         this.owner = new Int16Array(n).fill(-1);  // city id
         this.bld = new Int32Array(n).fill(-1);    // building id
         this.landmass = new Int32Array(n).fill(-1);
+        this.waterbody = new Int32Array(n).fill(-1); // connected open water (for boats)
+        this.ore = new Uint8Array(n);        // EP.ORE type
+        this.oreAmt = new Uint8Array(n);     // units left in the vein
         this.dirty = new Set();              // tiles needing re-render
         this.version = 0;                    // bumps on any terrain change (minimap)
         this.ownerVersion = 0;               // bumps on territory change
@@ -37,7 +40,7 @@ class World {
         const old = this.terrain[i];
         if (old === t) return;
         this.terrain[i] = t;
-        if (TERRAIN[old].walk !== TERRAIN[t].walk) this.landDirty = true;
+        if (TERRAIN[old].walk !== TERRAIN[t].walk || TERRAIN[old].water !== TERRAIN[t].water) this.landDirty = true;
         // Keep height consistent with the terrain class so later raise/lower behaves.
         const h = this.height[i];
         if (t === T.DEEP) this.height[i] = Math.min(h, EP.SHALLOW - 8);
@@ -46,7 +49,14 @@ class World {
         else if (t === T.HILLS) this.height[i] = EP.clamp(h, EP.HILLS + 2, EP.PEAK - 2);
         else this.height[i] = EP.clamp(h, EP.SEA + 2, EP.HILLS - 2);
         if (this.tree[i] && !EP.canHoldTree(t)) this.tree[i] = 0;
+        if (this.ore[i] && !EP.canHoldOre(t)) { this.ore[i] = 0; this.oreAmt[i] = 0; }
         if (this.fire[i] && !TERRAIN[t].burn && !this.tree[i]) this.fire[i] = 0;
+        this.touch(i);
+    }
+    setOre(i, type, amt) {
+        if (type && !EP.canHoldOre(this.terrain[i])) return;
+        this.ore[i] = type; this.oreAmt[i] = type ? amt : 0;
+        if (type && this.tree[i]) this.tree[i] = 0;
         this.touch(i);
     }
     setTree(i, v) {
@@ -93,7 +103,29 @@ class World {
             this.landmassSizes[id] = size;
             id++;
         }
+        // Open-water bodies: boats can sail anywhere inside one.
+        const wb = this.waterbody, T0 = T.DEEP, T1 = T.SHALLOW, ter = this.terrain;
+        const isW = i => ter[i] === T0 || ter[i] === T1;
+        wb.fill(-1);
+        this.waterSizes = [];
+        id = 0;
+        for (let s = 0; s < w * h; s++) {
+            if (wb[s] !== -1 || !isW(s)) continue;
+            let sp = 0, size = 0;
+            stack[sp++] = s; wb[s] = id;
+            while (sp) {
+                const i = stack[--sp]; size++;
+                const x = i % w, y = (i / w) | 0;
+                if (x > 0 && wb[i - 1] === -1 && isW(i - 1)) { wb[i - 1] = id; stack[sp++] = i - 1; }
+                if (x < w - 1 && wb[i + 1] === -1 && isW(i + 1)) { wb[i + 1] = id; stack[sp++] = i + 1; }
+                if (y > 0 && wb[i - w] === -1 && isW(i - w)) { wb[i - w] = id; stack[sp++] = i - w; }
+                if (y < h - 1 && wb[i + w] === -1 && isW(i + w)) { wb[i + w] = id; stack[sp++] = i + w; }
+            }
+            this.waterSizes[id] = size;
+            id++;
+        }
         this.landDirty = false;
+        this.landVersion = (this.landVersion || 0) + 1;
     }
     sameLand(ax, ay, bx, by) {
         if (!this.inb(ax | 0, ay | 0) || !this.inb(bx | 0, by | 0)) return false;
@@ -102,6 +134,113 @@ class World {
     }
 }
 EP.World = World;
+
+// ================================================================ Pathfinding
+// Grid A* with 8-way moves. cost(i) returns the step cost into tile i, or a negative number when blocked.
+// goal is a tile index. Returns an array of tile indices from start to goal, or null.
+class Heap {
+    constructor() { this.n = []; this.f = []; }
+    get size() { return this.n.length; }
+    push(node, f) {
+        const n = this.n, F = this.f; let i = n.length;
+        n.push(node); F.push(f);
+        while (i > 0) { const p = (i - 1) >> 1; if (F[p] <= f) break; n[i] = n[p]; F[i] = F[p]; i = p; }
+        n[i] = node; F[i] = f;
+    }
+    pop() {
+        const n = this.n, F = this.f, top = n[0], ln = n.pop(), lf = F.pop();
+        if (n.length) {
+            let i = 0; const len = n.length;
+            for (;;) {
+                let c = 2 * i + 1; if (c >= len) break;
+                if (c + 1 < len && F[c + 1] < F[c]) c++;
+                if (F[c] >= lf) break;
+                n[i] = n[c]; F[i] = F[c]; i = c;
+            }
+            n[i] = ln; F[i] = lf;
+        }
+        return top;
+    }
+}
+const PDX = [1, -1, 0, 0, 1, 1, -1, -1], PDY = [0, 0, 1, -1, 1, -1, 1, -1];
+EP.findPath = function (w, start, goal, cost, maxNodes = 12000) {
+    const N = w.w * w.h;
+    if (start < 0 || goal < 0 || start >= N || goal >= N) return null;
+    if (!w._pf || w._pf.g.length !== N) w._pf = { g: new Float32Array(N), from: new Int32Array(N), seen: new Int32Array(N), stamp: 0 };
+    const pf = w._pf;
+    const stamp = ++pf.stamp;
+    const gx = goal % w.w, gy = (goal / w.w) | 0;
+    const hfun = i => { const dx = Math.abs(i % w.w - gx), dy = Math.abs(((i / w.w) | 0) - gy); return (dx + dy - 0.59 * Math.min(dx, dy)) * 0.45; };
+    const open = new Heap();
+    pf.g[start] = 0; pf.from[start] = -1; pf.seen[start] = stamp;
+    open.push(start, hfun(start));
+    let expanded = 0;
+    while (open.size) {
+        const i = open.pop();
+        if (i === goal) {
+            const path = [];
+            for (let c = goal; c !== -1; c = pf.from[c]) path.push(c);
+            return path.reverse();
+        }
+        if (++expanded > maxNodes) return null;
+        const x = i % w.w, y = (i / w.w) | 0, gi = pf.g[i];
+        for (let k = 0; k < 8; k++) {
+            const nx = x + PDX[k], ny = y + PDY[k];
+            if (nx < 0 || ny < 0 || nx >= w.w || ny >= w.h) continue;
+            const j = ny * w.w + nx;
+            let c = j === goal ? Math.max(0.5, cost(j)) : cost(j);
+            if (c < 0) continue;
+            if (k > 3) { // no corner cutting
+                if (cost(y * w.w + nx) < 0 || cost(ny * w.w + x) < 0) continue;
+                c *= 1.414;
+            }
+            const ng = gi + c;
+            if (pf.seen[j] === stamp && ng >= pf.g[j]) continue;
+            pf.seen[j] = stamp; pf.g[j] = ng; pf.from[j] = i;
+            open.push(j, ng + hfun(j));
+        }
+    }
+    return null;
+};
+
+// Scatter ore veins through hills and mountains.
+EP.seedOres = function (world, rng) {
+    const { w, h } = world, ter = world.terrain;
+    const rocky = [], high = [], mountain = [], open = [];
+    for (let i = 0; i < w * h; i++) {
+        const t = ter[i];
+        if (t === T.MOUNTAIN) { rocky.push(i); high.push(i); mountain.push(i); }
+        else if (t === T.HILLS || t === T.ROCK || (t === T.SNOW && world.height[i] >= EP.HILLS)) { rocky.push(i); if (rng.next() < 0.3) high.push(i); }
+        else if (t === T.GRASS || t === T.SAVANNA || t === T.DESERT || t === T.SNOW) open.push(i);
+    }
+    // Flat worlds still get ore: veins push up small rocky outcrops on open ground.
+    const basis = Math.max(rocky.length, (rocky.length + open.length) * 0.1);
+    if (!basis) return;
+    const outcrop = 1 - rocky.length / basis;
+    for (const [type, o] of Object.entries(EP.ORE_INFO)) {
+        const mtn = o.rock === 'mountain';
+        let pool = mtn ? mountain : o.rock === 'high' ? (high.length ? high : rocky) : rocky;
+        const clusters = Math.max(o.density >= 1 ? 1 : 0, Math.round(basis / 1000 * o.density * (0.8 + rng.next() * 0.4)));
+        for (let c = 0; c < clusters; c++) {
+            const raise = !mtn && open.length && (!pool.length || rng.next() < outcrop);
+            if (!raise && !pool.length) break;
+            let i = raise ? open[(rng.next() * open.length) | 0] : pool[(rng.next() * pool.length) | 0];
+            const n = rng.int(o.size[0], o.size[1]);
+            let placed = 0;
+            for (let s = 0; s < 40 && placed < n; s++) {
+                if (raise && !world.ore[i] && (ter[i] === T.GRASS || ter[i] === T.SAVANNA || ter[i] === T.DESERT || ter[i] === T.SNOW)) {
+                    ter[i] = ter[i] === T.SNOW ? T.SNOW : T.HILLS;
+                    world.height[i] = Math.max(world.height[i], EP.HILLS + 2 + rng.int(0, 8));
+                }
+                if (!world.ore[i] && EP.canHoldOre(ter[i]) && (!mtn || ter[i] === T.MOUNTAIN || rng.next() < 0.25)) {
+                    world.ore[i] = +type; world.oreAmt[i] = rng.int(o.amt[0], o.amt[1]); world.tree[i] = 0; placed++;
+                }
+                const k = (rng.next() * 4) | 0, nx = (i % w) + DX8[k], ny = ((i / w) | 0) + DY8[k];
+                if (nx >= 0 && ny >= 0 && nx < w && ny < h) i = ny * w + nx;
+            }
+        }
+    }
+};
 
 EP.canHoldTree = t => t === T.GRASS || t === T.SAVANNA || t === T.DESERT || t === T.SAND || t === T.SWAMP || t === T.SNOW || t === T.HILLS || t === T.SOIL;
 
@@ -187,6 +326,7 @@ EP.generateWorld = function (world, opts) {
         }
         if (p && rng.next() < p) world.tree[i] = EP.treeFor(t, rng.next());
     }
+    EP.seedOres(world, new EP.RNG(seed ^ 0x0fe5));
     world.computeLandmasses();
     world.version++;
     return world;
@@ -343,7 +483,9 @@ class Environment {
                     if (nearWater) sim.fx.burst(x + 0.5, y + 0.5, 4, { color: '#dddddd', speed: 0.03, life: 40, rise: 0.02, size: 1.5 });
                     break;
                 }
-                case T.ROAD: if (w.owner[i] < 0 && rng.next() < 0.04) w.setTerrain(i, T.GRASS); break;
+                // Abandoned roads slowly return to nature (highways between towns decay slowly).
+                case T.ROAD: if (w.owner[i] < 0 && rng.next() < 0.004) w.setTerrain(i, T.GRASS); break;
+                case T.PAVED: if (w.owner[i] < 0 && rng.next() < 0.002) w.setTerrain(i, T.ROAD); break;
                 case T.FARM: if (w.owner[i] < 0 && rng.next() < 0.06) w.setTerrain(i, T.GRASS); break;
             }
             // Forest spread
@@ -409,7 +551,9 @@ class Environment {
         w.fire[i] = 0; this.fires.delete(i);
         const t = w.terrain[i];
         if (w.tree[i]) w.setTree(i, 0);
-        if (t === T.GRASS || t === T.SAVANNA || t === T.FARM || t === T.SWAMP || t === T.SOIL) w.setTerrain(i, T.ASH);
+        if (t === T.BRIDGE) { w.setTerrain(i, T.SHALLOW); return; }
+        if (t === T.GRASS
+ || t === T.SAVANNA || t === T.FARM || t === T.SWAMP || t === T.SOIL) w.setTerrain(i, T.ASH);
         else w.touch(i);
     }
 }

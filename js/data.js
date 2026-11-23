@@ -19,7 +19,7 @@ EP.SNOWCAP = 232;
 // ---------------------------------------------------------------- Terrain
 const T = EP.T = {
     DEEP: 0, SHALLOW: 1, SAND: 2, GRASS: 3, SAVANNA: 4, DESERT: 5, SWAMP: 6, SNOW: 7,
-    HILLS: 8, MOUNTAIN: 9, LAVA: 10, ASH: 11, FARM: 12, ROAD: 13, ROCK: 14, SOIL: 15,
+    HILLS: 8, MOUNTAIN: 9, LAVA: 10, ASH: 11, FARM: 12, ROAD: 13, ROCK: 14, SOIL: 15, PAVED: 16, BRIDGE: 17,
 };
 // colors: 4 shades light→dark used for dithered texture.
 // walk: land creatures can stand here. slow: movement multiplier. burn: chance to catch fire.
@@ -42,8 +42,61 @@ def(T.FARM,     { name: 'Farmland',     colors: ['#a8c94e', '#97b845', '#7e5a36'
 def(T.ROAD,     { name: 'Road',         colors: ['#c7a77b', '#b99a70', '#ab8d66', '#9c805b'], build: false, slow: 1.25 });
 def(T.ROCK,     { name: 'Basalt',       colors: ['#5d5a5e', '#545155', '#4b484c', '#424043'], build: true });
 def(T.SOIL,     { name: 'Soil',         colors: ['#9b7653', '#8e6b4a', '#816142', '#73563a'], build: true, grow: true, graze: 0.2 });
+def(T.PAVED,    { name: 'Paved road',   colors: ['#b5aea2', '#a39c90', '#8f897e', '#77726a'], build: false, slow: 1.4 });
+def(T.BRIDGE,   { name: 'Bridge',       colors: ['#b0864f', '#9a7444', '#7f5e36', '#5f4527'], build: false, slow: 1.2, burn: 0.01 });
 
 EP.isWaterT = t => t === T.DEEP || t === T.SHALLOW;
+EP.isRoadT = t => t === T.ROAD || t === T.PAVED || t === T.BRIDGE;
+
+// ---------------------------------------------------------------- Ores
+// Veins sit in hills, mountains and basalt. amt: units per vein; yield: resource per mining trip.
+// value: how keen miners are on it. density: clusters per 1000 rocky tiles. rock: any | high (mostly mountains) | mountain.
+const O = EP.ORE = { NONE: 0, COPPER: 1, IRON: 2, COAL: 3, GOLD: 4, GEMS: 5, MITHRIL: 6, ADAMANTINE: 7 };
+EP.ORE_INFO = {
+    [O.COPPER]:     { id: 'copper', name: 'Copper', res: 'copper', color: '#e0823c', hi: '#ffc08a', dk: '#8a4a1f', amt: [10, 18], yield: 2, value: 1.2, density: 6, size: [4, 9], rock: 'any' },
+    [O.IRON]:       { id: 'iron', name: 'Iron', res: 'iron', color: '#b8735a', hi: '#e6b8a0', dk: '#5e3a2e', amt: [10, 18], yield: 2, value: 1.6, density: 5, size: [4, 8], rock: 'any' },
+    [O.COAL]:       { id: 'coal', name: 'Coal', res: 'coal', color: '#2b2a30', hi: '#6a6a78', dk: '#121216', amt: [12, 20], yield: 3, value: 1.1, density: 6, size: [4, 9], rock: 'any' },
+    [O.GOLD]:       { id: 'gold', name: 'Gold', res: 'gold', color: '#ffcf3a', hi: '#fff4b0', dk: '#a87a10', amt: [6, 12], yield: 3, value: 2.4, density: 2.5, size: [3, 6], rock: 'high' },
+    [O.GEMS]:       { id: 'gems', name: 'Gems', res: 'gems', color: '#ff4f8b', hi: '#ffd0e2', dk: '#8a1a45', amt: [4, 9], yield: 1, value: 2.6, density: 1.5, size: [2, 4], rock: 'high' },
+    [O.MITHRIL]:    { id: 'mithril', name: 'Mithril', res: 'mithril', color: '#7fe3ff', hi: '#e6fbff', dk: '#2a7fa8', amt: [4, 8], yield: 1, value: 3.2, density: 0.9, size: [2, 4], rock: 'mountain' },
+    [O.ADAMANTINE]: { id: 'adamantine', name: 'Adamantine', res: 'adamantine', color: '#b36bff', hi: '#ecd6ff', dk: '#5a2a99', amt: [3, 6], yield: 1, value: 4, density: 0.4, size: [1, 3], rock: 'mountain' },
+};
+EP.ORE_BY_ID = Object.fromEntries(Object.entries(EP.ORE_INFO).map(([k, v]) => [v.id, +k]));
+EP.canHoldOre = t => t === T.HILLS || t === T.MOUNTAIN || t === T.ROCK || t === T.SNOW;
+// Every stockpiled resource a realm can hold.
+EP.RESOURCES = ['food', 'wood', 'stone', 'gold', 'copper', 'iron', 'coal', 'gems', 'mithril', 'adamantine'];
+EP.RES_INFO = {
+    food: { name: 'Food', color: '#c9e05a' }, wood: { name: 'Wood', color: '#a8763e' }, stone: { name: 'Stone', color: '#a39e96' },
+    gold: { name: 'Gold', color: '#ffd34d' }, copper: { name: 'Copper', color: '#e0823c' }, iron: { name: 'Iron', color: '#c08a76' },
+    coal: { name: 'Coal', color: '#8a8a98' }, gems: { name: 'Gems', color: '#ff4f8b' }, mithril: { name: 'Mithril', color: '#7fe3ff' },
+    adamantine: { name: 'Adamantine', color: '#b36bff' },
+};
+
+// ---------------------------------------------------------------- Equipment
+// Forged at a smithy from ore. Tier 0 is the crude kit everyone starts with.
+// atk multiplies attack; def is the fraction of damage armour absorbs.
+EP.GEAR = [
+    { id: 'crude', name: 'Crude', atk: 1, def: 0, color: '#8b6a45', age: 0, cost: {} },
+    { id: 'copper', name: 'Copper', atk: 1.15, def: 0.1, color: '#e0823c', age: 1, cost: { copper: 3 } },
+    { id: 'iron', name: 'Iron', atk: 1.3, def: 0.18, color: '#a9b1b8', age: 2, cost: { iron: 3 } },
+    { id: 'steel', name: 'Steel', atk: 1.5, def: 0.28, color: '#e4ecf2', age: 3, cost: { iron: 3, coal: 2 } },
+    { id: 'mithril', name: 'Mithril', atk: 1.75, def: 0.4, color: '#7fe3ff', age: 3, cost: { mithril: 2, coal: 1 } },
+    { id: 'adamantine', name: 'Adamantine', atk: 2, def: 0.52, color: '#b36bff', age: 4, cost: { adamantine: 2, coal: 1 } },
+];
+EP.WEAPON_NAME = { human: 'sword', elf: 'bow', dwarf: 'axe', orc: 'cleaver' };
+
+// ---------------------------------------------------------------- Realm ranks
+// A realm's title grows with its towns and people; rulers take grander titles.
+EP.RANKS = [
+    { name: 'Tribe', towns: 1, pop: 0 },
+    { name: 'Chiefdom', towns: 1, pop: 25 },
+    { name: 'Kingdom', towns: 2, pop: 45 },
+    { name: 'Empire', towns: 5, pop: 160 },
+];
+EP.RULER_TITLE = {
+    human: ['Chief', 'Lord', 'King', 'Emperor'], elf: ['Elder', 'Lord', 'High King', 'Eternal Monarch'],
+    dwarf: ['Thane', 'Lord', 'King', 'High King'], orc: ['Warboss', 'Chieftain', 'Overlord', 'Warlord Supreme'],
+};
 
 // ---------------------------------------------------------------- Trees
 const TR = EP.TREE = { NONE: 0, OAK: 1, PINE: 2, PALM: 3, CACTUS: 4, WILLOW: 5, BUSH: 6, SNOWPINE: 7, BIRCH: 8 };
@@ -144,11 +197,12 @@ EP.RANDOM_TRAITS = ['strong', 'tough', 'swift', 'wise', 'brave', 'coward', 'weak
 
 // ---------------------------------------------------------------- Ages
 EP.AGES = [
-    { name: 'Stone Age',  tech: 0,    atk: 1.0, hp: 1.0,  weapon: '#8b6a45' },
-    { name: 'Bronze Age', tech: 260,  atk: 1.15, hp: 1.1, weapon: '#c98a3b' },
-    { name: 'Iron Age',   tech: 800,  atk: 1.3, hp: 1.2,  weapon: '#9aa3ab' },
-    { name: 'Steel Age',  tech: 1900, atk: 1.5, hp: 1.35, weapon: '#d9e1e8' },
-    { name: 'Golden Age', tech: 4200, atk: 1.75, hp: 1.5, weapon: '#ffd34d' },
+    // Weapons & armour forged from ore (EP.GEAR) now carry most of a realm's military edge.
+    { name: 'Stone Age',  tech: 0,    atk: 1.0,  hp: 1.0  },
+    { name: 'Bronze Age', tech: 260,  atk: 1.05, hp: 1.05 },
+    { name: 'Iron Age',   tech: 800,  atk: 1.1,  hp: 1.1  },
+    { name: 'Steel Age',  tech: 1900, atk: 1.15, hp: 1.15 },
+    { name: 'Golden Age', tech: 4200, atk: 1.2,  hp: 1.2  },
 ];
 
 // ---------------------------------------------------------------- Buildings
@@ -159,20 +213,26 @@ EP.BUILDINGS = {
     temple:   { name: 'Temple', w: 2, h: 2, hp: 300, cost: { wood: 30, stone: 12 }, minAge: 1, time: 240, desc: 'Speeds research and heals the faithful.' },
     tower:    { name: 'Watchtower', w: 1, h: 1, hp: 280, cost: { wood: 15, stone: 10 }, minAge: 1, time: 150, range: 6.5, desc: 'Shoots arrows at invaders and beasts.' },
     barracks: { name: 'Barracks', w: 3, h: 2, hp: 380, cost: { wood: 40, stone: 18 }, minAge: 2, time: 260, desc: 'Trains a larger standing army.' },
-    mine:     { name: 'Mine', w: 2, h: 2, hp: 220, cost: { wood: 18 }, time: 160, desc: 'Extracts stone and gold from nearby hills.' },
+    mine:     { name: 'Mine', w: 2, h: 2, hp: 220, cost: { wood: 18 }, time: 160, desc: 'Miners working near it dig out more stone and ore.' },
+    granary:  { name: 'Granary', w: 2, h: 2, hp: 200, cost: { wood: 20 }, time: 130, desc: 'Stores grain: less spoilage, bigger harvests.' },
+    docks:    { name: 'Docks', w: 2, h: 2, hp: 220, cost: { wood: 30 }, time: 170, desc: 'Launches fishing boats, transports for settlers and invasions, and trade ships.' },
+    smithy:   { name: 'Smithy', w: 2, h: 2, hp: 300, cost: { wood: 25, stone: 15 }, minAge: 1, time: 200, desc: 'Forges weapons and armour from copper, iron, coal, mithril and adamantine.' },
+    windmill: { name: 'Windmill', w: 2, h: 2, hp: 220, cost: { wood: 25, stone: 5 }, minAge: 1, time: 170, desc: 'Grinds grain: every farmer in town harvests more.' },
+    market:   { name: 'Market', w: 3, h: 2, hp: 260, cost: { wood: 35, stone: 20 }, minAge: 2, time: 220, desc: 'Sends trade carts and ships to friendly towns and sells gems for gold.' },
+    library:  { name: 'Library', w: 2, h: 2, hp: 280, cost: { wood: 30, stone: 25, gold: 10 }, minAge: 2, time: 240, desc: 'Scholars speed up research.' },
 };
 
 // ---------------------------------------------------------------- Names
 EP.KINGDOM_NAMES = {
     human: [['New', 'Old', 'Great', 'United', 'Eastern', 'Western', 'Northern', 'Southern', 'Holy', 'Royal'],
             ['york', 'haven', 'spring', 'ford', 'castle', 'keep', 'warren', 'shire', 'field', 'mount'],
-            ['', ' Kingdom', ' Empire', ' Realm', ' Domain', ' March']],
+            ['', ' Realm', ' Domain', ' March', ' Lands', ' Shire']],
     elf:   [['Silver', 'Golden', 'Eternal', 'Ancient', 'Mystic', 'Twilight', 'Moonlit', 'Crystal', 'Starlight', 'Verdant'],
             ['wood', 'vale', 'glade', 'haven', 'realm', 'throne', 'crown', 'light', 'star', 'mist'],
             ['', ' of the Woods', ' of Stars', ' Eternal', ' Court']],
     dwarf: [['Iron', 'Stone', 'Deep', 'Grand', 'Mighty', 'Ancient', 'High', 'Low', 'Copper', 'Granite'],
             ['hold', 'forge', 'hall', 'deep', 'stone', 'gate', 'breach', 'horn', 'rock', 'guard'],
-            ['', ' Kingdom', ' Stronghold', ' Citadel', ' Clans']],
+            ['', ' Holds', ' Stronghold', ' Citadel', ' Clans']],
     orc:   [['Dark', 'War', 'Wild', 'Savage', 'Storm', 'Blood', 'Fire', 'Tusk', 'Claw', 'Bone'],
             ['hold', 'tribe', 'clan', 'horde', 'peak', 'ridge', 'skull', 'tooth', 'fang', 'maw'],
             ['', ' Horde', ' Tribe', ' Clan', ' Dominion']],
@@ -199,6 +259,7 @@ EP.TOOL_CATEGORIES = [
     { id: 'peoples', name: 'Peoples', icon: 'cat_life' },
     { id: 'animals', name: 'Animals', icon: 'cat_animals' },
     { id: 'monsters', name: 'Monsters', icon: 'cat_monsters' },
+    { id: 'ores', name: 'Ores', icon: 'cat_ores' },
     { id: 'nature', name: 'Nature', icon: 'cat_nature' },
     { id: 'destroy', name: 'Wrath', icon: 'cat_destroy' },
     { id: 'realm', name: 'Realms', icon: 'cat_realm' },
@@ -223,6 +284,9 @@ EP.TOOLS = [
     ...EP.CIV_RACES.map(r => tool('peoples', r, EP.SPECIES[r].plural, 'spawn', { desc: EP.SPECIES[r].desc, species: r, repeat: 120, sized: false })),
     ...EP.ANIMALS.map(s => tool('animals', s, EP.SPECIES[s].plural, 'spawn', { desc: EP.SPECIES[s].desc, species: s, repeat: 120, sized: false })),
     ...EP.MONSTERS.map(s => tool('monsters', s, EP.SPECIES[s].plural, 'spawn', { desc: EP.SPECIES[s].desc, species: s, repeat: s === 'dragon' || s === 'ufo' ? 0 : 160, sized: false })),
+
+    tool('ores', 'ore_mix', 'Ore Veins', 'brush', { desc: 'Seed common ore: copper, iron and coal. Soft ground is pushed up into hills.', ore: 'mix' }),
+    ...Object.values(EP.ORE_INFO).map(o => tool('ores', 'ore_' + o.id, o.name, 'brush', { desc: `Place ${o.name.toLowerCase()} veins for miners to dig out.`, ore: o.id })),
 
     tool('nature', 'bless', 'Blessing', 'power', { desc: 'Heal creatures and grant them divine strength.', repeat: 150, sized: true }),
     tool('nature', 'rain', 'Rain Cloud', 'power', { desc: 'Summon rain: douses fires, cools lava, greens the land.', repeat: 500 }),
@@ -249,7 +313,7 @@ EP.TOOLS = [
     tool('realm', 'discord', 'Discord', 'power', { desc: 'Sow hatred between realms in the area. War follows.', repeat: 0 }),
     tool('realm', 'harmony', 'Harmony', 'power', { desc: 'Force peace upon warring realms in the area.', repeat: 0 }),
     tool('realm', 'rebel', 'Rebellion', 'power', { desc: 'Incite a town to break away and form its own realm.', repeat: 0 }),
-    tool('realm', 'prosper', 'Prosperity', 'power', { desc: 'Shower a realm with food, wood, stone and knowledge.', repeat: 300 }),
+    tool('realm', 'prosper', 'Prosperity', 'power', { desc: 'Shower a realm with food, wood, stone, ore and knowledge.', repeat: 300 }),
 ];
 EP.TOOL_BY_ID = Object.fromEntries(EP.TOOLS.map(t => [t.id, t]));
 

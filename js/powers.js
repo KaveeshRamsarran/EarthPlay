@@ -106,6 +106,20 @@ class Powers {
         const sim = this.sim, w = sim.world, rng = sim.rng;
         const r = Math.max(0, size - 0.6);
         if (tool.type === 'spawn') return this.spawn(tool.species, x, y);
+        if (tool.ore) {
+            const MIX = [EP.ORE.COPPER, EP.ORE.IRON, EP.ORE.COAL];
+            this.forTiles(x, y, r, (i, tx, ty) => {
+                const t = w.terrain[i];
+                if (TERRAIN[t].water || t === T.LAVA || w.bld[i] >= 0 || EP.isRoadT(t) || t === T.FARM) return;
+                if (r >= 1 && !rng.chance(0.55)) return;
+                if (!EP.canHoldOre(t)) { w.height[i] = EP.HILLS + 4 + ((EP.hash2(tx, ty, 7) * 18) | 0); w.setTerrain(i, T.HILLS); }
+                const type = tool.ore === 'mix' ? rng.pick(MIX) : EP.ORE_BY_ID[tool.ore];
+                const o = EP.ORE_INFO[type];
+                w.setOre(i, type, rng.int(o.amt[0], o.amt[1]));
+            });
+            if (rng.chance(0.4)) sim.fx.burst(x, y, 4, { colors: [EP.ORE_INFO[tool.ore === 'mix' ? 1 : EP.ORE_BY_ID[tool.ore]].color, '#ffffff'], speed: 0.03, life: 20, rise: 0.02, size: 1, glow: true });
+            return;
+        }
         if (tool.terrain != null) {
             this.forTiles(x, y, r, (i, tx, ty, d) => {
                 if (tool.terrain === T.MOUNTAIN) w.height[i] = Math.max(w.height[i], EP.PEAK + 6 + ((EP.hash2(tx, ty, 7) * 20) | 0));
@@ -147,7 +161,7 @@ class Powers {
                 });
                 break;
             case 'bless':
-                for (const u of this.unitsIn(x, y, r + 0.8, u => u.kind !== 'monster')) {
+                for (const u of this.unitsIn(x, y, r + 0.8, u => u.kind !== 'monster' && !(u.boarded > 0))) {
                     if (!u.traits.includes('blessed')) { u.traits.push('blessed'); Units.recalc(sim, u); }
                     u.hp = u.hpMax; u.sick = 0;
                 }
@@ -312,6 +326,7 @@ class Powers {
                 if (!c) { sim.emit('toast', 'Click on a realm’s territory to bless it with prosperity.'); break; }
                 const k = sim.civ.kingdoms.get(c.kingdomId);
                 k.food += 80; k.wood += 80; k.stone += 50; k.gold += 20; k.tech += 120;
+                k.copper += 15; k.iron += 15; k.coal += 15;
                 sim.fx.burst(c.x, c.y, 24, { colors: ['#ffd34d', '#fff3a0', '#ffffff'], speed: 0.05, life: 50, rise: 0.03, spread: 4, glow: true });
                 sim.fx.text(c.x, c.y - 2, 'Prosperity!', '#ffe066');
                 sim.emit('sfx', { name: 'bless', x, y });
@@ -344,6 +359,7 @@ class Powers {
         sim.fx.ring(x, y, 2.2, '#cfe0ff', 14);
         sim.fx.burst(x, y, 12, { colors: ['#ffffff', '#cfe0ff', '#ffe066'], speed: 0.1, life: 18, glow: true });
         for (const u of this.unitsIn(x, y, 1.8)) Units.damage(sim, u, 70, null, 'lightning');
+        sim.vehicles.damageAt(x, y, 1.8, 70);
         if (w.isWater(x, y)) for (const u of this.unitsIn(x, y, 3.5, u => w.isWater(u.x, u.y))) Units.damage(sim, u, 40, null, 'lightning');
         this.forTiles(x, y, 1.2, i => { if (w.bld[i] >= 0) sim.civ.damageBuilding(w.bld[i], 70, null); });
         sim.env.ignite(x, y);
@@ -361,7 +377,15 @@ class Powers {
             if (w.tree[i]) w.setTree(i, 0);
             if (w.isLandI(i)) {
                 if (d < r * (o.lava || 0)) w.setTerrain(i, T.LAVA);
-                else if (d < r * 0.75) w.setTerrain(i, rng.chance(0.5) ? T.ROCK : T.ASH);
+                else if (d < r * 0.75) {
+                    w.setTerrain(i, rng.chance(0.5) ? T.ROCK : T.ASH);
+                    // Meteors leave precious star-metal in the crater.
+                    if (o.ore && w.terrain[i] === T.ROCK && rng.chance(0.45)) {
+                        const type = rng.pick([EP.ORE.ADAMANTINE, EP.ORE.MITHRIL, EP.ORE.MITHRIL, EP.ORE.IRON, EP.ORE.GOLD]);
+                        const oi = EP.ORE_INFO[type];
+                        w.setOre(i, type, rng.int(oi.amt[0], oi.amt[1]));
+                    }
+                }
                 else if (TERRAIN[w.terrain[i]].burn || w.terrain[i] === T.SAND) w.setTerrain(i, T.ASH);
                 // restore height to land range in case setTerrain clamped it
             } else sim.fx.burst(tx + 0.5, ty + 0.5, 1, { color: '#e8f0ff', speed: 0.02, life: 50, rise: 0.03, size: 2 });
@@ -376,6 +400,7 @@ class Powers {
             if (Units.passable(sim, u, nx, ny)) { u.x = nx; u.y = ny; }
             Units.damage(sim, u, (o.dmg || 150) * f + 10, null, o.cause || 'explosion');
         }
+        sim.vehicles.damageAt(x, y, R2, (o.dmg || 150) * 0.8);
         this.forTiles(x, y, r + 2.5, (i, tx, ty, d) => { if (d > r * 0.8 && rng.chance(0.35)) sim.env.ignite(tx, ty); });
         sim.fx.burst(x, y, Math.min(120, 20 + r * 8), { colors: FIRE_COLS, speed: 0.04 + r * 0.02, life: 40, rise: 0.02, glow: true, size: 2 });
         sim.fx.burst(x, y, Math.min(120, 15 + r * 6), { colors: SMOKE_COLS, speed: 0.02 + r * 0.01, life: 120, rise: 0.025, size: 3, grow: 0.03, spread: r });
@@ -403,7 +428,8 @@ class Powers {
         const sim = this.sim, w = sim.world;
         switch (f.kind) {
             case 'meteor':
-                this.explode(f.x, f.y, 3.6, { lava: 0.35, depth: 45, dmg: 220, bdmg: 500 });
+                this.explode(f.x, f.y, 3.6, { lava: 0.35, depth: 45, dmg: 220, bdmg: 500, ore: true });
+
                 sim.emit('sfx', { name: 'explosion', x: f.x, y: f.y });
                 break;
             case 'nuke':

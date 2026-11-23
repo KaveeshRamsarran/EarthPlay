@@ -2,7 +2,7 @@
 (function () {
 'use strict';
 const EP = globalThis.EP;
-const VERSION = 2;
+const VERSION = 3;
 
 function toB64(u8) {
     if (typeof Buffer !== 'undefined') return Buffer.from(u8.buffer, u8.byteOffset, u8.byteLength).toString('base64');
@@ -37,7 +37,10 @@ const Save = EP.Save = {
                 w: w.w, h: w.h,
                 terrain: toB64(w.terrain), height: toB64(w.height), tree: toB64(w.tree), fire: toB64(w.fire), wear: toB64(w.wear),
                 owner: toB64(bytes(w.owner)), bld: toB64(bytes(w.bld)),
+                ore: toB64(w.ore), oreAmt: toB64(w.oreAmt),
             },
+            vehicles: sim.vehicles.list.filter(v => !v.dead).map(v => { const o = Object.assign({}, v); delete o.px; delete o.py; delete o.moving; return o; }),
+            nextVehicle: sim.vehicles.next,
             units,
             civ: {
                 kingdoms: [...sim.civ.kingdoms.values()], cities: [...sim.civ.cities.values()].map(strip),
@@ -56,6 +59,8 @@ const Save = EP.Save = {
         w.terrain.set(fromB64(d.world.terrain)); w.height.set(fromB64(d.world.height));
         w.tree.set(fromB64(d.world.tree)); w.fire.set(fromB64(d.world.fire)); w.wear.set(fromB64(d.world.wear));
         bytes(w.owner).set(fromB64(d.world.owner)); bytes(w.bld).set(fromB64(d.world.bld));
+        if (d.world.ore) { w.ore.set(fromB64(d.world.ore)); w.oreAmt.set(fromB64(d.world.oreAmt)); }
+        else EP.seedOres(w, new EP.RNG(d.seed ^ 0x0fe5)); // worlds from before ores get veins now
         for (let i = 0; i < w.fire.length; i++) if (w.fire[i]) sim.env.fires.add(i);
         w.computeLandmasses();
         w.version++; w.ownerVersion++;
@@ -63,16 +68,21 @@ const Save = EP.Save = {
         for (const o of d.units) {
             const u = Object.assign(Object.create(EP.Unit.prototype), o);
             u.px = u.x; u.py = u.y; u.moving = false; u.stuck = 0; u.lastD = Infinity; u.detour = 0; u.detourT = 0; u.hitT = 0;
+            if (u.wpn == null) { u.wpn = 0; u.arm = 0; u.boarded = 0; }
             sim.units.push(u); sim.unitMap.set(u.id, u);
             sim.speciesCount[u.species] = (sim.speciesCount[u.species] || 0) + 1;
             if (u.kind === 'civ') sim.civCount = (sim.civCount || 0) + 1;
         }
         const civ = sim.civ;
-        for (const k of d.civ.kingdoms) { civ.kingdoms.set(k.id, k); civ.usedNames.add(k.name); }
+        for (const k of d.civ.kingdoms) { civ.kingdoms.set(k.id, civ.ensureKingdom(k)); civ.usedNames.add(k.name); }
         for (const c of d.civ.cities) { c.members = []; civ.cities.set(c.id, c); }
         for (const b of d.civ.buildings) civ.buildings.set(b.id, b);
         civ.nextK = d.civ.nextK; civ.nextC = d.civ.nextC; civ.nextB = d.civ.nextB;
-        for (const u of sim.units) if (u.task && u.task.i != null && u.task.kind === 'chop') civ.reserved.set(u.task.i, u.id);
+        for (const u of sim.units) if (u.task && u.task.i != null && u.task.i >= 0) civ.reserved.set(u.task.i, u.id);
+        for (const o of d.vehicles || []) { o.px = o.x; o.py = o.y; sim.vehicles.list.push(o); sim.vehicles.map.set(o.id, o); }
+        sim.vehicles.next = d.nextVehicle || 1;
+        for (const u of sim.units) if (u.boarded > 0 && !sim.vehicles.map.has(u.boarded)) u.boarded = 0;
+
         if (d.env) { Object.assign(sim.env.weather, d.env.weather); sim.env.wind = d.env.wind || sim.env.wind; sim.env.clouds = d.env.clouds || []; }
         sim.logEntries = d.log || []; sim.history = d.history || [];
         civ.census();
