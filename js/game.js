@@ -263,10 +263,14 @@ class Game {
         const sim = this.sim;
         const u = sim.grid.nearest(tx, ty + 0.3, 1.1, () => true) || this.unitNear(tx, ty);
         if (u) { this.ui.openPanel('unit', u.id); this.audio.play('select'); return; }
+        const v = sim.vehicles.nearest(tx, ty, 1.2);
+        if (v) { this.ui.openPanel('vehicle', v.id); this.audio.play('select'); return; }
         const w = sim.world;
         if (!w.inb(tx | 0, ty | 0)) return;
         const bid = w.bld[w.idx(tx | 0, ty | 0)];
         if (bid >= 0 && sim.civ.buildings.get(bid)?.type !== 'farm') { this.ui.openPanel('building', bid); this.audio.play('select'); return; }
+        const oi = w.idx(tx | 0, ty | 0);
+        if (w.ore[oi]) { this.ui.openPanel('ore', oi); this.audio.play('select'); return; }
         const c = sim.civ.cityAt(tx, ty);
         if (c) { this.ui.openPanel('city', c.id); this.audio.play('select'); return; }
         this.ui.closePanel();
@@ -274,7 +278,7 @@ class Game {
     unitNear(tx, ty) {
         // Fallback linear scan (grid is rebuilt each tick, so it's normally enough)
         let best = null, bd = 1.2 * 1.2;
-        for (const u of this.sim.units) { if (u.dead) continue; const d = EP.dist2(u.x, u.y - 0.4, tx, ty); if (d < bd) { bd = d; best = u; } }
+        for (const u of this.sim.units) { if (u.dead || u.boarded > 0) continue; const d = EP.dist2(u.x, u.y - 0.4, tx, ty); if (d < bd) { bd = d; best = u; } }
         return best;
     }
 

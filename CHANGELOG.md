@@ -1,5 +1,62 @@
 # Changelog
 
+## 3.2 — Ores, kingdoms & industry
+
+**Ores**
+- Hills and mountains now hold veins of copper, iron, coal, gold, gems, mithril and adamantine, baked into the terrain as glinting nuggets (and shown on the minimap). Flat worlds get small rocky outcrops so every map has some.
+- Miners seek out the ore their realm needs most and deplete veins as they dig; a nearby mine and dwarven miners dig out more.
+- A new **Ores** tab paints veins of any ore (Ore Veins seeds a copper/iron/coal mix). Meteors leave mithril, adamantine and gold in their craters.
+
+**Weapons & armour**
+- **Smithies** forge copper, iron, steel (iron + coal), mithril and adamantine weapons and armour, unlocked by age. Kit goes to warriors first and old kit is handed down.
+- Weapons multiply attack; armour absorbs part of every blow. Each race has its own weapon (swords, bows, axes, cleavers), coloured by its metal, and armoured people wear a metal helmet and greaves.
+- The age bonuses are smaller now, so forged kit carries most of a realm's military edge.
+
+**Towns**
+- Six new buildings: **Granary** (bigger harvests, less spoilage), **Docks**, **Smithy**, **Windmill** (more food per farmer), **Market** (trade, sells gems for gold) and **Library** (faster research).
+- Builders lay **roads** from the town hall to every building and **highways** between sister towns, **bridge** rivers, and **pave** streets in the Iron Age.
+- Realms short of timber import it with gold or surplus stone.
+
+**Boats & carts**
+- Docks launch **fishing boats** that bring home food.
+- Crowded realms with no land left send **settler ships** to other islands.
+- Realms at war with an overseas enemy launch **invasion fleets** carrying warriors.
+- Markets send **trade carts** along the roads, and **trade ships** between ports, earning gold and goodwill. Ships and carts can be wrecked by explosions, lightning and dragonfire.
+
+**Kingdoms**
+- Realms grow from **Tribe** to **Chiefdom**, **Kingdom** and **Empire**, and their rulers take grander titles (Chief, Lord, King, Emperor; Warboss … Warlord Supreme).
+- Friendly realms form **alliances**, and allies usually rally when one is attacked.
+- Warriors stranded on another landmass join a sister town there, or eventually strike out on their own.
+
+**Map**
+- Realm colours fill their territory more strongly the further you zoom out, and kingdom banners with name, rank and population float over capitals; town names appear at middle zoom.
+- Wars are drawn as bold red arrows from each side towards the town it is marching on, with pulsing crossed swords on the front line; soldiers flash a crossed-swords bubble as they clash.
+- Every building is redrawn in the same outlined pixel style as the creatures, per race and age (thatched huts to stone houses, longhalls to castles). Windows light up at night (some go dark late at night), chimneys smoke, banners wave, windmill sails turn and forges glow and spark.
+
+**Panels**
+- Creatures show their weapon and armour.
+- Kingdoms show their rank and ruler title, ores, best kit, ships, carts and allies.
+- Docks, markets and smithies report their boats, caravans and the best metal they can forge.
+- Click a ship, cart or ore vein to inspect it. Stats lists the ore left in the world.
+
+**Saves**: version 3. Worlds saved before ores existed get veins seeded when they load.
+
+## 3.1 — Menagerie & pixel UI
+
+**More life**
+- 15 new animals: chicken, cow, buffalo, camel, penguin, monkey, frog, turtle, crab, bee, fox, hyena, crocodile, snake and shark. Every wild species has a home biome where it is seeded, returns to and migrates back into.
+- 4 new monsters: skeleton, demon, ice golem and UFO.
+- New behaviours: amphibious creatures wade through shallows; buffalo stampede at threats; snake bites cause sickness; bees plant shrubs and green scorched ground; sharks hunt swimmers; crocodiles ambush waders; demons leave fire and climb out of volcanoes; ice golems freeze creatures and turn land to tundra; UFOs zap buildings and abduct people; skeletons, demons and golems smash buildings.
+
+**New powers**: Bomb, Napalm, Acid, Blizzard, Madness and Fireworks. Cure now also calms madness and thaws frozen creatures; Undeath raises skeletons as well as zombies.
+
+**Natural disasters**: a new world option (Off / Rare / Often) for random meteors, tornadoes, earthquakes, volcanoes, blizzards, UFO visits and dragons.
+
+**Look & feel**
+- The HUD is rebuilt in a chunky pixel/cartoon style with notched pixel frames, bevelled push buttons, Pixelify Sans throughout, pixel-art icons in place of emoji, a parchment tooltip, colour-coded dock tabs and a hopping critter parade on the title screen.
+- Cartoon emote bubbles over creatures, ice blocks around frozen creatures, UFO tractor beams, laser bolts, falling bombs, fireworks and creature-sized shadows.
+- The dock is split into Peoples, Animals and Monsters tabs; Stats lists every species.
+
 ## 3.0 — Full overhaul
 
 A ground-up rewrite of the engine, visuals and gameplay.

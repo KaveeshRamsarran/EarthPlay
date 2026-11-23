@@ -6,7 +6,7 @@ const path = require('path');
 const vm = require('vm');
 
 const root = path.join(__dirname, '..', 'js');
-for (const f of ['core.js', 'data.js', 'world.js', 'units.js', 'civ.js', 'powers.js', 'sim.js', 'save.js'])
+for (const f of ['core.js', 'data.js', 'world.js', 'units.js', 'civ.js', 'powers.js', 'vehicles.js', 'sim.js', 'save.js'])
     vm.runInThisContext(fs.readFileSync(path.join(root, f), 'utf8'), { filename: f });
 const EP = globalThis.EP;
 
@@ -39,6 +39,7 @@ function invariants(sim, label) {
 }
 
 (async () => {
+    const totals = { roads: 0, geared: 0, ore: 0, vehicles: 0 };
     for (const shape of ['continent', 'pangaea', 'archipelago', 'lakes']) {
         console.log(`\n[${shape}] medium world`);
         const t0 = Date.now();
@@ -53,8 +54,24 @@ function invariants(sim, label) {
         console.log(`  ${TICKS} ticks in ${dt}ms (${(dt / TICKS).toFixed(2)} ms/tick), year ${sim.year}`);
         const pop = sim.census();
         console.log('  population:', JSON.stringify(pop));
-        for (const k of sim.civ.aliveKingdoms()) console.log(`   - ${k.name} (${k.race}) pop ${k.pop} towns ${k.cities.length} ${EP.AGES[k.age].name} food ${k.food | 0} wood ${k.wood | 0} stone ${k.stone | 0} wars ${Object.keys(k.wars).length}`);
+        for (const k of sim.civ.aliveKingdoms()) {
+            const ores = ['copper', 'iron', 'coal', 'gold', 'gems', 'mithril', 'adamantine'].map(r => `${r[0]}${r[1]}${k[r] | 0}`).join(' ');
+            console.log(`   - ${k.name} [${EP.RANKS[k.rank].name}] (${k.race}) pop ${k.pop} towns ${k.cities.length} ${EP.AGES[k.age].name} food ${k.food | 0} wood ${k.wood | 0} stone ${k.stone | 0} | ${ores} | allies ${Object.keys(k.allies).length} wars ${Object.keys(k.wars).length}`);
+        }
         invariants(sim, shape);
+        const w = sim.world;
+        let veins = 0, roads = 0, paved = 0, bridges = 0;
+        for (let i = 0; i < w.w * w.h; i++) { if (w.ore[i]) veins++; const t = w.terrain[i]; if (t === EP.T.ROAD) roads++; else if (t === EP.T.PAVED) paved++; else if (t === EP.T.BRIDGE) bridges++; }
+        const gear = {};
+        for (const u of sim.units) if (u.kind === 'civ' && (u.wpn || u.arm)) { const key = EP.GEAR[Math.max(u.wpn, u.arm)].id; gear[key] = (gear[key] || 0) + 1; }
+        const fleet = {};
+        for (const v of sim.vehicles.list) fleet[v.type] = (fleet[v.type] || 0) + 1;
+        console.log(`  ore veins left ${veins} · roads ${roads} paved ${paved} bridges ${bridges} · geared ${JSON.stringify(gear)} · vehicles ${JSON.stringify(fleet)}`);
+        check(veins > 0, 'world has ore veins');
+        check(sim.units.every(u => !(u.boarded > 0) || sim.vehicles.map.has(u.boarded)), 'boarded units ride live vehicles');
+        totals.roads += roads + paved + bridges; totals.geared += Object.values(gear).reduce((a, b) => a + b, 0);
+        totals.ore += sim.civ.aliveKingdoms().reduce((s, k) => s + k.copper + k.iron + k.coal + k.gems + k.mithril + k.adamantine, 0);
+        totals.vehicles += sim.vehicles.list.length + sim.vehicles.next - 1;
         const civPop = EP.CIV_RACES.reduce((s, r) => s + (pop[r] || 0), 0);
         check(civPop > 30, `civilisations grew (civ pop ${civPop})`);
         check(sim.civ.buildings.size > 10, `towns built things (${sim.civ.buildings.size} buildings)`);
@@ -63,6 +80,11 @@ function invariants(sim, label) {
         console.log('  buildings:', JSON.stringify(types));
         console.log('  log tail:'); for (const e of sim.logEntries.slice(-6)) console.log(`    y${e.year}: ${e.text}`);
     }
+    console.log('\n[economy] across all worlds');
+    check(totals.roads > 50, `realms built roads (${totals.roads} tiles)`);
+    check(totals.ore > 0, `realms mined ore (${totals.ore | 0} in stock)`);
+    check(totals.geared > 10, `smiths equipped people (${totals.geared})`);
+    check(totals.vehicles > 0, `boats and carts launched (${totals.vehicles})`);
 
     console.log('\n[tools] every tool on a live world');
     const sim = new EP.Sim({ size: 'small', shape: 'pangaea', seed: 777, life: 'civ' });
@@ -79,6 +101,38 @@ function invariants(sim, label) {
     check(errors === 0, `all ${EP.TOOLS.length} tools applied without errors`);
     for (let i = 0; i < 3000; i++) sim.update();
     invariants(sim, 'after tools');
+
+    console.log('\n[species] every creature spawns and lives');
+    {
+        const zoo = new EP.Sim({ size: 'small', shape: 'pangaea', seed: 4242, life: 'wild', disasters: 'often' });
+        const wild = EP.WILD.filter(s => !(zoo.speciesCount[s] > 0));
+        check(wild.length <= 3, `wildlife seeded in habitats (${EP.WILD.length - wild.length}/${EP.WILD.length}${wild.length ? ', missing ' + wild.join(' ') : ''})`);
+        const w = zoo.world;
+        let land = null, sea = null;
+        for (let i = 0; i < w.w * w.h && (!land || !sea); i++) {
+            const t = w.terrain[i];
+            if (!land && t === EP.T.GRASS) land = { x: i % w.w + 0.5, y: ((i / w.w) | 0) + 0.5 };
+            if (!sea && t === EP.T.DEEP) sea = { x: i % w.w + 0.5, y: ((i / w.w) | 0) + 0.5 };
+        }
+        let errs = 0, made = 0;
+        for (const s of Object.keys(EP.SPECIES)) {
+            const at = EP.SPECIES[s].kind === 'aquatic' ? sea : land;
+            if (!at) continue;
+            try { if (zoo.powers.spawn(s, at.x, at.y)) made++; } catch (e) { errs++; console.error(`  ✗ spawn ${s}: ${e.stack}`); }
+        }
+        check(made >= Object.keys(EP.SPECIES).length - 2, `spawned ${made}/${Object.keys(EP.SPECIES).length} species by hand`);
+        try {
+            zoo.powers.apply('madness', land.x, land.y, 4);
+            zoo.powers.apply('blizzard', land.x + 3, land.y, 3);
+            for (let i = 0; i < 4000; i++) zoo.update();
+        } catch (e) { errs++; console.error('  ✗ zoo sim: ' + e.stack); }
+        check(errs === 0, 'mixed ecosystem runs without errors');
+        invariants(zoo, 'zoo');
+        const pop = zoo.census();
+        console.log('  census:', JSON.stringify(pop));
+        console.log('  events:'); for (const e of zoo.logEntries.slice(-5)) console.log(`    y${e.year}: ${e.text}`);
+        check(zoo.units.every(u => !(u.madT > 0) || u.traits.includes('mad')), 'madness state consistent');
+    }
 
     console.log('\n[save] round trip');
     const packed = await EP.Save.pack(sim);

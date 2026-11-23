@@ -9,7 +9,7 @@ const R = Math.random;
 // ================================================================ Effects
 class Effects {
     constructor() {
-        this.particles = []; this.bolts = []; this.rings = []; this.texts = [];
+        this.particles = []; this.bolts = []; this.rings = []; this.texts = []; this.emotes = [];
         this.shakeAmt = 0; this.flashAmt = 0; this.flashColor = '#ffffff';
     }
     burst(x, y, n, o = {}) {
@@ -43,6 +43,8 @@ class Effects {
         this.bolts.push({ pts, life: 12, maxLife: 12 });
     }
     text(x, y, str, color = '#fff') { this.texts.push({ x, y, str, color, life: 60 }); }
+    // Cartoon speech-bubble icons over creatures: heart, alert, skull, angry, note.
+    emote(x, y, kind) { if (this.emotes.length < 160) this.emotes.push({ x, y, kind, life: 70, max: 70 }); }
     shake(a) { this.shakeAmt = Math.min(2.5, Math.max(this.shakeAmt, a)); }
     flash(a, color = '#ffffff') { if (a > this.flashAmt) { this.flashAmt = a; this.flashColor = color; } }
     update() {
@@ -59,6 +61,7 @@ class Effects {
         for (let i = this.bolts.length - 1; i >= 0; i--) if (--this.bolts[i].life <= 0) this.bolts.splice(i, 1);
         for (let i = this.rings.length - 1; i >= 0; i--) { const r = this.rings[i]; r.r += (r.max - r.r) * 0.2; if (--r.life <= 0) this.rings.splice(i, 1); }
         for (let i = this.texts.length - 1; i >= 0; i--) { const t = this.texts[i]; t.y -= 0.015; if (--t.life <= 0) this.texts.splice(i, 1); }
+        for (let i = this.emotes.length - 1; i >= 0; i--) { const e = this.emotes[i]; e.y -= 0.006; if (--e.life <= 0) this.emotes.splice(i, 1); }
         this.shakeAmt *= 0.9; if (this.shakeAmt < 0.02) this.shakeAmt = 0;
         this.flashAmt *= 0.9; if (this.flashAmt < 0.01) this.flashAmt = 0;
     }
@@ -67,12 +70,13 @@ EP.Effects = Effects;
 
 const FIRE_COLS = ['#fff3a0', '#ffd34d', '#ff9f1c', '#ff5a1f', '#d63a1a'];
 const SMOKE_COLS = ['#3a3a3a', '#555555', '#6e6e6e', '#888888'];
+const FIREWORK_COLS = [['#ff5a7a', '#ffd0dc', '#ffffff'], ['#5fd0ff', '#d0f2ff', '#ffffff'], ['#ffe066', '#fff6c4', '#ff9f1c'], ['#8be08b', '#e0ffd0', '#ffffff'], ['#c79bff', '#efe2ff', '#ffffff']];
 
 // ================================================================ Powers
 class Powers {
     constructor(sim) {
         this.sim = sim;
-        this.falling = []; this.tornados = []; this.quakes = []; this.volcanoes = [];
+        this.falling = []; this.tornados = []; this.quakes = []; this.volcanoes = []; this.rockets = [];
     }
     forTiles(x, y, r, fn) {
         const w = this.sim.world;
@@ -102,6 +106,20 @@ class Powers {
         const sim = this.sim, w = sim.world, rng = sim.rng;
         const r = Math.max(0, size - 0.6);
         if (tool.type === 'spawn') return this.spawn(tool.species, x, y);
+        if (tool.ore) {
+            const MIX = [EP.ORE.COPPER, EP.ORE.IRON, EP.ORE.COAL];
+            this.forTiles(x, y, r, (i, tx, ty) => {
+                const t = w.terrain[i];
+                if (TERRAIN[t].water || t === T.LAVA || w.bld[i] >= 0 || EP.isRoadT(t) || t === T.FARM) return;
+                if (r >= 1 && !rng.chance(0.55)) return;
+                if (!EP.canHoldOre(t)) { w.height[i] = EP.HILLS + 4 + ((EP.hash2(tx, ty, 7) * 18) | 0); w.setTerrain(i, T.HILLS); }
+                const type = tool.ore === 'mix' ? rng.pick(MIX) : EP.ORE_BY_ID[tool.ore];
+                const o = EP.ORE_INFO[type];
+                w.setOre(i, type, rng.int(o.amt[0], o.amt[1]));
+            });
+            if (rng.chance(0.4)) sim.fx.burst(x, y, 4, { colors: [EP.ORE_INFO[tool.ore === 'mix' ? 1 : EP.ORE_BY_ID[tool.ore]].color, '#ffffff'], speed: 0.03, life: 20, rise: 0.02, size: 1, glow: true });
+            return;
+        }
         if (tool.terrain != null) {
             this.forTiles(x, y, r, (i, tx, ty, d) => {
                 if (tool.terrain === T.MOUNTAIN) w.height[i] = Math.max(w.height[i], EP.PEAK + 6 + ((EP.hash2(tx, ty, 7) * 20) | 0));
@@ -143,7 +161,7 @@ class Powers {
                 });
                 break;
             case 'bless':
-                for (const u of this.unitsIn(x, y, r + 0.8, u => u.kind !== 'monster')) {
+                for (const u of this.unitsIn(x, y, r + 0.8, u => u.kind !== 'monster' && !(u.boarded > 0))) {
                     if (!u.traits.includes('blessed')) { u.traits.push('blessed'); Units.recalc(sim, u); }
                     u.hp = u.hpMax; u.sick = 0;
                 }
@@ -153,8 +171,9 @@ class Powers {
                 break;
             case 'heal':
                 for (const u of this.unitsIn(x, y, r + 0.8)) {
-                    u.sick = 0;
-                    if (u.species === 'zombie') {
+                    u.sick = 0; u.frozen = 0;
+                    if (u.madT > 0) Units.calm(sim, u);
+                    if (u.species === 'zombie' || u.species === 'skeleton') {
                         const race = rng.pick(EP.CIV_RACES);
                         Units.kill(sim, u, 'cured', null);
                         sim.spawnUnit(race, u.x, u.y, {});
@@ -184,6 +203,54 @@ class Powers {
                 sim.fx.burst(x, y, 8, { colors: FIRE_COLS, speed: 0.03, life: 25, rise: 0.04, spread: r * 2, glow: true });
                 sim.emit('sfx', { name: 'fire', x, y });
                 break;
+            case 'bomb':
+                this.falling.push({ kind: 'bomb', x, y, sx: x, sy: y - 18, t: 0, dur: 26 });
+                sim.emit('sfx', { name: 'whoosh', x, y });
+                break;
+            case 'napalm': {
+                const dir = rng.chance(0.5) ? 1 : -1;
+                for (let k = -5; k <= 5; k++) {
+                    const bx = x + k * 1.25 * dir, by = y + rng.float(-0.6, 0.6);
+                    this.falling.push({ kind: 'napalm', x: bx, y: by, sx: bx - 6 * dir, sy: by - 16, t: 0, dur: 22 + (k + 5) * 4 });
+                }
+                sim.emit('sfx', { name: 'whoosh', x, y });
+                break;
+            }
+            case 'acid': {
+                this.forTiles(x, y, r, (i, tx, ty) => {
+                    if (!rng.chance(0.6)) return;
+                    if (w.tree[i]) { w.setTree(i, 0); sim.fx.burst(tx + 0.5, ty + 0.5, 2, { colors: ['#8fff3a', '#5c8a2e'], speed: 0.03, life: 24, rise: 0.02 }); }
+                    const t = w.terrain[i];
+                    if (t === T.GRASS || t === T.SAVANNA || t === T.SOIL || t === T.SWAMP || t === T.SNOW || t === T.SAND) w.setTerrain(i, T.ASH);
+                    if (w.bld[i] >= 0) sim.civ.damageBuilding(w.bld[i], 14, null);
+                });
+                for (const u of this.unitsIn(x, y, r + 0.7)) Units.damage(sim, u, 9, null, 'acid');
+                sim.fx.burst(x, y, 6 + size * 3, { colors: ['#b6ff5a', '#8fff3a', '#e6ffb0'], speed: 0.02, life: 30, grav: 0.004, z: 2, spread: r * 2 + 1, size: 1.2 });
+                sim.emit('sfx', { name: 'acid', x, y });
+                break;
+            }
+            case 'blizzard': {
+                this.forTiles(x, y, r, i => { if (rng.chance(0.7)) sim.env.freeze(i); });
+                for (const u of this.unitsIn(x, y, r + 0.8)) { Units.freeze(sim, u, 160 + rng.int(0, 80)); if (!u.dead && !SPECIES[u.species].frost) Units.damage(sim, u, 2, null, 'frostbite'); }
+                sim.fx.burst(x, y, 10 + size * 4, { colors: ['#ffffff', '#dff4ff', '#bfe8ff'], speed: 0.03, life: 50, grav: 0.002, z: 3, spread: r * 2 + 2, size: 1.2 });
+                sim.emit('sfx', { name: 'freeze', x, y });
+                break;
+            }
+            case 'madness': {
+                const vic = this.unitsIn(x, y, r + 1, u => u.kind === 'civ' || u.kind === 'animal');
+                for (const u of vic) Units.madden(sim, u, 700 + rng.int(0, 500));
+                sim.fx.burst(x, y, 10 + size * 2, { colors: ['#ff3b3b', '#ff9b6b', '#a30000'], speed: 0.03, life: 40, rise: 0.02, spread: r * 2 });
+                sim.emit('sfx', { name: 'mad', x, y });
+                break;
+            }
+            case 'fireworks': {
+                for (let k = 0; k < 5; k++) this.rockets.push({ x: x + rng.float(-2.5, 2.5), y: y + rng.float(-1.5, 1.5), z: 0, vz: 0.16 + rng.float(0, 0.06), t: 0, fuse: 26 + rng.int(0, 22), hue: rng.int(0, FIREWORK_COLS.length - 1) });
+                const ks = sim.civ.kingdomsNear(x, y, 16);
+                for (const a of ks) for (const b of ks) if (a !== b) a.relations[b.id] = Math.min(100, (a.relations[b.id] || 0) + 20);
+                for (const u of this.unitsIn(x, y, 10, u => u.kind === 'civ' && !(u.madT > 0))) if (rng.chance(0.5)) sim.fx.emote(u.x, u.y, rng.chance(0.5) ? 'note' : 'heart');
+                if (ks.length >= 2) sim.fx.text(x, y - 3, 'Celebration!', '#ffe066');
+                break;
+            }
             case 'meteor':
                 this.falling.push({ kind: 'meteor', x, y, sx: x + 14, sy: y - 22, t: 0, dur: 42 });
                 sim.emit('sfx', { name: 'whoosh', x, y });
@@ -210,7 +277,7 @@ class Powers {
             }
             case 'curse': {
                 const vic = this.unitsIn(x, y, r + 1, u => u.kind === 'civ' || u.kind === 'animal');
-                for (const u of vic) { Units.kill(sim, u, 'cursed', null); sim.spawnUnit('zombie', u.x, u.y, { age: 0 }); }
+                for (const u of vic) { Units.kill(sim, u, 'cursed', null); sim.spawnUnit(u.kind === 'civ' && rng.chance(0.4) ? 'skeleton' : 'zombie', u.x, u.y, { age: 0 }); }
                 if (!vic.length) for (let k = 0; k < 2; k++) sim.spawnUnit('zombie', x + rng.float(-1, 1), y + rng.float(-1, 1), { age: 0 });
                 sim.fx.burst(x, y, 14, { colors: ['#7a3fbf', '#a86bff', '#2b1a3d'], speed: 0.03, life: 45, rise: 0.02, spread: r * 2 + 1 });
                 sim.emit('sfx', { name: 'curse', x, y });
@@ -259,6 +326,7 @@ class Powers {
                 if (!c) { sim.emit('toast', 'Click on a realm’s territory to bless it with prosperity.'); break; }
                 const k = sim.civ.kingdoms.get(c.kingdomId);
                 k.food += 80; k.wood += 80; k.stone += 50; k.gold += 20; k.tech += 120;
+                k.copper += 15; k.iron += 15; k.coal += 15;
                 sim.fx.burst(c.x, c.y, 24, { colors: ['#ffd34d', '#fff3a0', '#ffffff'], speed: 0.05, life: 50, rise: 0.03, spread: 4, glow: true });
                 sim.fx.text(c.x, c.y - 2, 'Prosperity!', '#ffe066');
                 sim.emit('sfx', { name: 'bless', x, y });
@@ -291,6 +359,7 @@ class Powers {
         sim.fx.ring(x, y, 2.2, '#cfe0ff', 14);
         sim.fx.burst(x, y, 12, { colors: ['#ffffff', '#cfe0ff', '#ffe066'], speed: 0.1, life: 18, glow: true });
         for (const u of this.unitsIn(x, y, 1.8)) Units.damage(sim, u, 70, null, 'lightning');
+        sim.vehicles.damageAt(x, y, 1.8, 70);
         if (w.isWater(x, y)) for (const u of this.unitsIn(x, y, 3.5, u => w.isWater(u.x, u.y))) Units.damage(sim, u, 40, null, 'lightning');
         this.forTiles(x, y, 1.2, i => { if (w.bld[i] >= 0) sim.civ.damageBuilding(w.bld[i], 70, null); });
         sim.env.ignite(x, y);
@@ -308,7 +377,15 @@ class Powers {
             if (w.tree[i]) w.setTree(i, 0);
             if (w.isLandI(i)) {
                 if (d < r * (o.lava || 0)) w.setTerrain(i, T.LAVA);
-                else if (d < r * 0.75) w.setTerrain(i, rng.chance(0.5) ? T.ROCK : T.ASH);
+                else if (d < r * 0.75) {
+                    w.setTerrain(i, rng.chance(0.5) ? T.ROCK : T.ASH);
+                    // Meteors leave precious star-metal in the crater.
+                    if (o.ore && w.terrain[i] === T.ROCK && rng.chance(0.45)) {
+                        const type = rng.pick([EP.ORE.ADAMANTINE, EP.ORE.MITHRIL, EP.ORE.MITHRIL, EP.ORE.IRON, EP.ORE.GOLD]);
+                        const oi = EP.ORE_INFO[type];
+                        w.setOre(i, type, rng.int(oi.amt[0], oi.amt[1]));
+                    }
+                }
                 else if (TERRAIN[w.terrain[i]].burn || w.terrain[i] === T.SAND) w.setTerrain(i, T.ASH);
                 // restore height to land range in case setTerrain clamped it
             } else sim.fx.burst(tx + 0.5, ty + 0.5, 1, { color: '#e8f0ff', speed: 0.02, life: 50, rise: 0.03, size: 2 });
@@ -323,6 +400,7 @@ class Powers {
             if (Units.passable(sim, u, nx, ny)) { u.x = nx; u.y = ny; }
             Units.damage(sim, u, (o.dmg || 150) * f + 10, null, o.cause || 'explosion');
         }
+        sim.vehicles.damageAt(x, y, R2, (o.dmg || 150) * 0.8);
         this.forTiles(x, y, r + 2.5, (i, tx, ty, d) => { if (d > r * 0.8 && rng.chance(0.35)) sim.env.ignite(tx, ty); });
         sim.fx.burst(x, y, Math.min(120, 20 + r * 8), { colors: FIRE_COLS, speed: 0.04 + r * 0.02, life: 40, rise: 0.02, glow: true, size: 2 });
         sim.fx.burst(x, y, Math.min(120, 15 + r * 6), { colors: SMOKE_COLS, speed: 0.02 + r * 0.01, life: 120, rise: 0.025, size: 3, grow: 0.03, spread: r });
@@ -350,7 +428,8 @@ class Powers {
         const sim = this.sim, w = sim.world;
         switch (f.kind) {
             case 'meteor':
-                this.explode(f.x, f.y, 3.6, { lava: 0.35, depth: 45, dmg: 220, bdmg: 500 });
+                this.explode(f.x, f.y, 3.6, { lava: 0.35, depth: 45, dmg: 220, bdmg: 500, ore: true });
+
                 sim.emit('sfx', { name: 'explosion', x: f.x, y: f.y });
                 break;
             case 'nuke':
@@ -362,6 +441,17 @@ class Powers {
                 this.forTiles(f.x, f.y, 19, (i, tx, ty, d) => { if (d > 12 && sim.rng.chance(0.55)) sim.env.ignite(tx, ty, true); });
                 sim.log('A cataclysm scorched the earth', { x: f.x, y: f.y, type: 'disaster' });
                 sim.emit('sfx', { name: 'nuke', x: f.x, y: f.y });
+                break;
+            case 'bomb':
+                this.explode(f.x, f.y, 2.3, { lava: 0, depth: 14, dmg: 120, bdmg: 260, cause: 'bomb' });
+                sim.emit('sfx', { name: 'explosion', x: f.x, y: f.y });
+                break;
+            case 'napalm':
+                this.forTiles(f.x, f.y, 1.4, (i, tx, ty) => { sim.env.ignite(tx, ty, true); if (w.tree[i] && sim.rng.chance(0.3)) w.setTree(i, 0); if (w.bld[i] >= 0) sim.civ.damageBuilding(w.bld[i], 40, null); });
+                for (const u of this.unitsIn(f.x, f.y, 1.6)) Units.damage(sim, u, 35, null, 'napalm');
+                sim.fx.burst(f.x, f.y, 14, { colors: FIRE_COLS, speed: 0.06, life: 30, rise: 0.03, glow: true, size: 1.5 });
+                sim.fx.shake(0.4);
+                sim.emit('sfx', { name: 'fire', x: f.x, y: f.y });
                 break;
             case 'lavabomb': {
                 if (!w.inb(f.x | 0, f.y | 0)) break;
@@ -385,8 +475,19 @@ class Powers {
             const p = f.t / f.dur;
             const cx = EP.lerp(f.sx, f.x, p), cy = EP.lerp(f.sy, f.y, p);
             if (f.kind === 'meteor') sim.fx.burst(cx, cy, 2, { colors: FIRE_COLS, speed: 0.01, life: 18, glow: true, size: 1.5 });
-            if (f.kind === 'lavabomb') sim.fx.burst(cx, cy, 1, { colors: FIRE_COLS, speed: 0.005, life: 12, glow: true });
+            if (f.kind === 'lavabomb' || f.kind === 'napalm') sim.fx.burst(cx, cy, 1, { colors: FIRE_COLS, speed: 0.005, life: 12, glow: true });
             if (f.t >= f.dur) { this.falling.splice(i, 1); this.impact(f); }
+        }
+        // Fireworks
+        for (let i = this.rockets.length - 1; i >= 0; i--) {
+            const r = this.rockets[i];
+            r.t++; r.z += r.vz; r.vz *= 0.985;
+            sim.fx.burst(r.x, r.y, 1, { z: r.z, colors: ['#fff3a0', '#ffb43a'], speed: 0.004, life: 12, glow: true });
+            if (r.t < r.fuse) continue;
+            this.rockets.splice(i, 1);
+            sim.fx.burst(r.x, r.y, 46, { z: r.z, colors: FIREWORK_COLS[r.hue], speed: 0.11, life: 55, grav: 0.0035, glow: true, size: 1.3 });
+            sim.fx.burst(r.x, r.y, 10, { z: r.z, color: '#ffffff', speed: 0.03, life: 20, glow: true, size: 1.6 });
+            sim.emit('sfx', { name: 'firework', x: r.x, y: r.y });
         }
         // Quakes
         for (let i = this.quakes.length - 1; i >= 0; i--) {
@@ -439,6 +540,10 @@ class Powers {
                 this.falling.push({ kind: 'lavabomb', sx: v.x, sy: v.y - 1, x: v.x + Math.cos(a) * d, y: v.y + Math.sin(a) * d, t: 0, dur: 30 + (d * 2) | 0 });
             }
             if (v.life % 60 === 0) { sim.fx.shake(0.3); sim.emit('sfx', { name: 'rumble', x: v.x, y: v.y }); }
+            if (v.life % 160 === 80 && rng.chance(0.3)) {
+                const d = sim.spawnUnit('demon', v.x + rng.float(-1, 1), v.y + 1.5, {});
+                if (d) { sim.fx.burst(d.x, d.y, 12, { colors: FIRE_COLS, speed: 0.05, life: 30, rise: 0.03, glow: true }); sim.log('A demon crawled out of the volcano', { x: d.x, y: d.y, type: 'disaster', unit: d.id }); }
+            }
             if (v.life <= 0) this.volcanoes.splice(i, 1);
         }
     }

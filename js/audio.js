@@ -56,7 +56,7 @@ class AudioFX {
     play(name, vol = 1) {
         if (!this.enabled || !this.ctx || this.ctx.state !== 'running') return;
         const now = performance.now();
-        const gap = { chop: 120, build: 150, spawn: 60, fire: 200, thunder: 120, explosion: 80 }[name] || 50;
+        const gap = { chop: 120, build: 150, spawn: 60, fire: 200, thunder: 120, explosion: 80, firework: 90, zap: 120 }[name] || 50;
         if (this.last[name] && now - this.last[name] < gap) return;
         this.last[name] = now;
         const v = vol;
@@ -86,7 +86,12 @@ class AudioFX {
             case 'found': [440, 554, 659].forEach((f, i) => this.tone(f, 0.25, 'triangle', 0.07 * v, null, i * 0.09)); break;
             case 'fall': [392, 311, 262].forEach((f, i) => this.tone(f, 0.45, 'triangle', 0.08 * v, null, i * 0.16)); break;
             case 'conquest': this.noise(0.12, 0.3 * v, 180, 'lowpass'); this.noise(0.12, 0.3 * v, 180, 'lowpass', null, 0.18); this.tone(147, 0.7, 'sawtooth', 0.09 * v, null, 0.3); break;
-            case 'notify': this.tone(880, 0.06, 'sine', 0.06 * v); this.tone(1320, 0.1, 'sine', 0.05 * v, null, 0.06); break;
+            case 'firework': this.tone(500, 0.35, 'sine', 0.04 * v, 1900); this.noise(0.12, 0.35 * v, 900, 'lowpass', null, 0.35); this.noise(0.9, 0.12 * v, 5000, 'highpass', null, 0.4); break;
+            case 'zap': this.tone(1500, 0.22, 'square', 0.04 * v, 260); this.tone(1100, 0.22, 'sawtooth', 0.025 * v, 180, 0.03); break;
+            case 'freeze': this.tone(1700, 0.45, 'triangle', 0.05 * v, 2600); this.noise(0.6, 0.1 * v, 6000, 'highpass'); break;
+            case 'acid': this.noise(0.7, 0.14 * v, 1800, 'bandpass', 500, 0, 2); this.tone(300, 0.4, 'sine', 0.03 * v, 120); break;
+            case 'mad': this.tone(320, 0.18, 'sawtooth', 0.06 * v, 160); this.tone(340, 0.18, 'sawtooth', 0.05 * v, 150, 0.12); break;
+            case 'notify':this.tone(880, 0.06, 'sine', 0.06 * v); this.tone(1320, 0.1, 'sine', 0.05 * v, null, 0.06); break;
         }
     }
 }
